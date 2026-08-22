@@ -1,12 +1,15 @@
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 function getApiKeys() {
-  const keys = [];
+  const keys = (process.env.GEMINI_API_KEYS || '')
+    .split(',')
+    .map((key) => key.trim())
+    .filter(Boolean);
   for (let i = 1; i <= 10; i++) {
     const key = process.env[`GEMINI_API_KEY_${i}`];
     if (key) keys.push(key);
   }
-  return keys;
+  return [...new Set(keys)];
 }
 
 function extrairHtml(texto) {
@@ -132,4 +135,4 @@ ${htmlAtual}`;
   throw new Error('Não foi possível aplicar o refinamento. Último erro: ' + (ultimoErro?.message || 'desconhecido'));
 }
 
-module.exports = { gerarComGemini, refinarComGemini };
+module.exports = { gerarComGemini, refinarComGemini, getApiKeys };

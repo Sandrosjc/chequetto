@@ -53,6 +53,13 @@ separadas por vírgula, sem espaço:
 GEMINI_API_KEYS=AIzaSy...chave1,AIzaSy...chave2
 ```
 
+Também é possível usar `GEMINI_API_KEY_1` até `GEMINI_API_KEY_10`. O sistema
+remove chaves repetidas e tenta a próxima automaticamente quando uma falha.
+
+PDFs com texto, DOCX, planilhas e arquivos de código são lidos antes da
+geração. PDF escaneado, imagem, áudio e vídeo ainda precisam de OCR,
+transcrição ou análise multimodal para serem interpretados.
+
 ### 4. Rode
 ```bash
 npm start

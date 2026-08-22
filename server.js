@@ -1,10 +1,14 @@
 const express = require('express');
 const path = require('path');
+const multer = require('multer');
+const pdfParse = require('pdf-parse');
+const mammoth = require('mammoth');
+const XLSX = require('xlsx');
 const dotenv = require('dotenv');
 dotenv.config();
 
 const cookieParser = require('cookie-parser');
-const { gerarComGemini, refinarComGemini } = require('./gemini-manager');
+const { gerarComGemini, refinarComGemini, getApiKeys } = require('./gemini-manager');
 const {
   createUser,
   getUserByEmail,
@@ -20,12 +24,12 @@ const { signUserToken, requireAuth, hashPassword, comparePassword } = require('.
 
 const app = express();
 const PORT = process.env.PORT || 10000;
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { files: 10, fileSize: 15 * 1024 * 1024 },
+});
 
-const keys = [];
-for (let i = 1; i <= 10; i++) {
-  const key = process.env[`GEMINI_API_KEY_${i}`];
-  if (key) keys.push(key);
-}
+const keys = getApiKeys();
 
 app.use(express.json({ limit: '10mb' }));
 app.use(cookieParser());
@@ -58,6 +62,44 @@ function tryGetUser(req) {
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', keysLoaded: keys.length });
+});
+
+app.post('/api/files/extract', upload.array('files', 10), async (req, res) => {
+  try {
+    const documents = await Promise.all((req.files || []).map(async (file) => {
+      const extension = path.extname(file.originalname).toLowerCase();
+      let text = '';
+      let readable = true;
+
+      if (extension === '.pdf' || file.mimetype === 'application/pdf') {
+        text = (await pdfParse(file.buffer)).text;
+      } else if (extension === '.docx') {
+        text = (await mammoth.extractRawText({ buffer: file.buffer })).value;
+      } else if (['.xlsx', '.xls', '.ods'].includes(extension)) {
+        const workbook = XLSX.read(file.buffer, { type: 'buffer' });
+        text = workbook.SheetNames.map((sheetName) => {
+          const sheet = workbook.Sheets[sheetName];
+          return `Planilha: ${sheetName}\n${XLSX.utils.sheet_to_csv(sheet)}`;
+        }).join('\n\n');
+      } else if (['.txt', '.md', '.csv', '.json', '.html', '.htm', '.js', '.jsx', '.ts', '.tsx', '.css', '.scss', '.xml', '.yaml', '.yml', '.sql', '.py', '.java', '.go', '.rs', '.php', '.vue', '.svelte', '.log', '.rtf'].includes(extension) || file.mimetype.startsWith('text/')) {
+        text = file.buffer.toString('utf8');
+      } else {
+        const binary = file.buffer.subarray(0, Math.min(file.buffer.length, 100000)).includes(0);
+        if (!binary) text = file.buffer.toString('utf8');
+        else readable = false;
+      }
+
+      return {
+        name: file.originalname,
+        readable,
+        text: text.trim().slice(0, 50000),
+        message: readable ? undefined : 'Formato anexado sem extração de texto disponível.',
+      };
+    }));
+    res.json({ documents });
+  } catch (error) {
+    res.status(400).json({ error: error.message || 'Não foi possível ler os arquivos.' });
+  }
 });
 
 // ---------- Auth ----------

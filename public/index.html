@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Oficina — Criador de Aplicativos com IA</title>
+<title>Chequetto — Super Plataforma</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -11,9 +11,9 @@
   <!-- ===================== BANCADA ESQUERDA ===================== -->
   <aside class="bench">
     <div class="bench__brand">
-      <div class="brand__mark">⚙</div>
+      <div class="brand__mark">C</div>
       <div>
-        <p class="brand__title">Oficina</p>
+        <p class="brand__title">CHEQUETTO</p>
         <p class="brand__subtitle" id="apiStatus">verificando servidor...</p>
       </div>
       <div id="accountArea"></div>
@@ -22,14 +22,16 @@
       <button class="workspace-nav__item is-active" type="button"><span>✦</span> Criar aplicativo</button>
       <button class="workspace-nav__item" type="button" id="btnMeusProjetos"><span>▦</span> Meus projetos</button>
     </div>
-    <div class="bench__eyebrow"><span class="eyebrow__dot"></span> Workspace de criação <span class="eyebrow__status">online</span></div>
+    <div class="bench__eyebrow"><span class="eyebrow__dot"></span> Super Platform 2026 <span class="eyebrow__status">online</span></div>
     <div>
-      <label class="field__label" for="prompt">Descreva seu aplicativo</label>
+      <label class="field__label" for="prompt">O que vamos construir hoje?</label>
       <div class="prompt-wrap">
         <textarea id="prompt" rows="6" placeholder="Ex: crie uma lista de tarefas com prioridade e prazo..."></textarea>
+        <label class="btn-attach" for="fileAttach" title="Anexar arquivos">📎<input id="fileAttach" type="file" multiple hidden></label>
         <button type="button" class="btn-mic" id="btnMic" title="Falar em vez de digitar">🎤</button>
       </div>
-      <p class="field__hint" id="micHint">Quanto mais detalhes, melhor o resultado.</p>
+      <div class="attached-files" id="attachedFiles" hidden></div>
+      <p class="field__hint" id="micHint">Cole código, descreva seu app ou anexe arquivos para começar.</p>
     </div>
     <div class="bench__examples" id="examples">
       <p class="examples__title">Comece com uma ideia</p>
@@ -40,7 +42,7 @@
     </div>
     <button class="btn-primary" id="btnGerar">
       <span class="spinner" id="spinner" hidden></span>
-      <span id="btnGerarLabel">Gerar aplicativo</span>
+      <span id="btnGerarLabel">Gerar App</span>
     </button>
 
     <!-- ===================== BARRA DE ETAPAS ===================== -->

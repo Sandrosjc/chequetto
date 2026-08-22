@@ -27,14 +27,43 @@ document.addEventListener('DOMContentLoaded', () => {
     planoList: document.getElementById('planoList'),
     btnMic: document.getElementById('btnMic'),
     micHint: document.getElementById('micHint'),
+    fileAttach: document.getElementById('fileAttach'),
+    attachedFiles: document.getElementById('attachedFiles'),
   };
 
   let state = {
     codigoAtual: '',
     promptAtual: '',
     planoAtual: [],
-    historico: []
+    historico: [],
+    attachedFiles: []
   };
+
+  function renderAttachedFiles() {
+    if (!el.attachedFiles) return;
+    el.attachedFiles.innerHTML = '';
+    state.attachedFiles.forEach((file, index) => {
+      const item = document.createElement('span');
+      item.className = 'attached-file';
+      const icon = document.createElement('span');
+      icon.textContent = '📎';
+      icon.setAttribute('aria-hidden', 'true');
+      const name = document.createElement('span');
+      name.textContent = file.name;
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.title = 'Remover anexo';
+      remove.setAttribute('aria-label', `Remover ${file.name}`);
+      remove.textContent = '×';
+      item.append(icon, name, remove);
+      remove.addEventListener('click', () => {
+        state.attachedFiles.splice(index, 1);
+        renderAttachedFiles();
+      });
+      el.attachedFiles.appendChild(item);
+    });
+    el.attachedFiles.hidden = state.attachedFiles.length === 0;
+  }
 
   function showGeneratedCode(html, promptText = state.promptAtual) {
     state.codigoAtual = html;
@@ -69,6 +98,12 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
+
+  el.fileAttach?.addEventListener('change', () => {
+    state.attachedFiles.push(...Array.from(el.fileAttach.files || []));
+    renderAttachedFiles();
+    el.fileAttach.value = '';
+  });
 
   el.prompt?.addEventListener('keydown', (event) => {
     if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
@@ -147,15 +182,38 @@ document.addEventListener('DOMContentLoaded', () => {
     el.planoList.hidden = false;
   }
 
+  async function extractAttachedFiles() {
+    if (!state.attachedFiles.length) return '';
+    const formData = new FormData();
+    state.attachedFiles.forEach((file) => formData.append('files', file));
+    const response = await fetch('/api/files/extract', { method: 'POST', body: formData });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Não foi possível ler os anexos.');
+    return (data.documents || []).map((document) => {
+      if (!document.readable) return `Arquivo anexado: ${document.name} (${document.message})`;
+      return `Arquivo: ${document.name}\nConteúdo:\n${document.text || '[arquivo sem texto]'}`;
+    }).join('\n\n');
+  }
+
   if (el.btnGerar) {
-    el.btnGerar.addEventListener('click', () => {
-      const promptText = el.prompt ? el.prompt.value.trim() : '';
-      if (!promptText) {
+    el.btnGerar.addEventListener('click', async () => {
+      const basePrompt = el.prompt ? el.prompt.value.trim() : '';
+      if (!basePrompt && !state.attachedFiles.length) {
         alert('Por favor, descreva o aplicativo que você quer criar.');
         return;
       }
 
       setLoading(true);
+      if (el.status) el.status.textContent = state.attachedFiles.length ? 'Lendo seus arquivos...' : 'Preparando o pedido...';
+      let filesContext = '';
+      try {
+        filesContext = await extractAttachedFiles();
+      } catch (error) {
+        if (el.status) el.status.textContent = 'Erro: ' + error.message;
+        setLoading(false);
+        return;
+      }
+      const promptText = [basePrompt, filesContext].filter(Boolean).join('\n\n');
       state.promptAtual = promptText;
       if (el.planoList) { el.planoList.innerHTML = ''; el.planoList.hidden = true; }
       setStage('planejando');
