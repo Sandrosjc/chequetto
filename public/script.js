@@ -65,6 +65,18 @@ document.addEventListener('DOMContentLoaded', () => {
     el.attachedFiles.hidden = state.attachedFiles.length === 0;
   }
 
+  function addAttachedFiles(files) {
+    const newFiles = Array.from(files || []).filter((file) => {
+      const alreadyAttached = state.attachedFiles.some((attached) =>
+        attached.name === file.name && attached.size === file.size && attached.lastModified === file.lastModified
+      );
+      return !alreadyAttached;
+    });
+    if (!newFiles.length) return;
+    state.attachedFiles.push(...newFiles);
+    renderAttachedFiles();
+  }
+
   function showGeneratedCode(html, promptText = state.promptAtual) {
     state.codigoAtual = html;
     const blob = new Blob([html], { type: 'text/html' });
@@ -99,10 +111,26 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  document.getElementById('aiTips')?.addEventListener('click', (event) => {
+    const tip = event.target.closest('[data-tip]')?.getAttribute('data-tip');
+    if (!tip || !el.prompt) return;
+    el.prompt.value = el.prompt.value.trim()
+      ? `${el.prompt.value.trim()}\n${tip}`
+      : tip;
+    el.prompt.focus();
+  });
+
   el.fileAttach?.addEventListener('change', () => {
-    state.attachedFiles.push(...Array.from(el.fileAttach.files || []));
-    renderAttachedFiles();
+    addAttachedFiles(el.fileAttach.files);
     el.fileAttach.value = '';
+  });
+
+  el.prompt?.addEventListener('paste', (event) => {
+    const pastedFiles = Array.from(event.clipboardData?.files || []);
+    if (!pastedFiles.length) return;
+    event.preventDefault();
+    addAttachedFiles(pastedFiles);
+    if (el.micHint) el.micHint.textContent = `${pastedFiles.length} arquivo(s) colado(s). Clique em Gerar App para ler.`;
   });
 
   el.prompt?.addEventListener('keydown', (event) => {

@@ -27,8 +27,8 @@
       <label class="field__label" for="prompt">O que vamos construir hoje?</label>
       <div class="prompt-wrap">
         <textarea id="prompt" rows="6" placeholder="Ex: crie uma lista de tarefas com prioridade e prazo..."></textarea>
-        <label class="btn-attach" for="fileAttach" title="Anexar arquivos">📎<input id="fileAttach" type="file" multiple hidden></label>
-        <button type="button" class="btn-mic" id="btnMic" title="Falar em vez de digitar">🎤</button>
+        <label class="btn-attach" for="fileAttach" title="Adicionar arquivos" aria-label="Adicionar arquivos">+<input id="fileAttach" type="file" multiple hidden></label>
+        <button type="button" class="btn-mic" id="btnMic" title="Falar em vez de digitar" aria-label="Falar em vez de digitar">🎙</button>
       </div>
       <div class="attached-files" id="attachedFiles" hidden></div>
       <p class="field__hint" id="micHint">Cole código, descreva seu app ou anexe arquivos para começar.</p>
@@ -39,6 +39,13 @@
       <button class="chip" data-example="Crie uma calculadora de IMC">Calculadora de IMC</button>
       <button class="chip" data-example="Crie um conversor de moedas">Conversor de moedas</button>
       <button class="chip" data-example="Crie um cronômetro Pomodoro">Pomodoro</button>
+    </div>
+    <div class="bench__tips" id="aiTips">
+      <p class="examples__title">Dicas da IA</p>
+      <button class="chip" data-tip="Adicione login e cadastro de usuários">Login e cadastro</button>
+      <button class="chip" data-tip="Adicione busca, filtros e ordenação">Busca e filtros</button>
+      <button class="chip" data-tip="Adicione modo escuro e modo claro">Modo claro/escuro</button>
+      <button class="chip" data-tip="Adicione exportação para PDF e Excel">Exportar dados</button>
     </div>
     <button class="btn-primary" id="btnGerar">
       <span class="spinner" id="spinner" hidden></span>
