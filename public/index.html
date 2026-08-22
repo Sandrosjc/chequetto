@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Oficina — Criador de Aplicativos com IA</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="shell">
+  <!-- ===================== BANCADA ESQUERDA ===================== -->
+  <aside class="bench">
+    <div class="bench__brand">
+      <div class="brand__mark">⚙</div>
+      <div>
+        <p class="brand__title">Oficina</p>
+        <p class="brand__subtitle" id="apiStatus">verificando servidor...</p>
+      </div>
+      <div id="accountArea"></div>
+    </div>
+    <div class="workspace-nav" aria-label="Navegação do workspace">
+      <button class="workspace-nav__item is-active" type="button"><span>✦</span> Criar aplicativo</button>
+      <button class="workspace-nav__item" type="button" id="btnMeusProjetos"><span>▦</span> Meus projetos</button>
+    </div>
+    <div class="bench__eyebrow"><span class="eyebrow__dot"></span> Workspace de criação <span class="eyebrow__status">online</span></div>
+    <div>
+      <label class="field__label" for="prompt">Descreva seu aplicativo</label>
+      <div class="prompt-wrap">
+        <textarea id="prompt" rows="6" placeholder="Ex: crie uma lista de tarefas com prioridade e prazo..."></textarea>
+        <button type="button" class="btn-mic" id="btnMic" title="Falar em vez de digitar">🎤</button>
+      </div>
+      <p class="field__hint" id="micHint">Quanto mais detalhes, melhor o resultado.</p>
+    </div>
+    <div class="bench__examples" id="examples">
+      <p class="examples__title">Comece com uma ideia</p>
+      <button class="chip" data-example="Crie uma lista de tarefas com prioridade">Lista de tarefas</button>
+      <button class="chip" data-example="Crie uma calculadora de IMC">Calculadora de IMC</button>
+      <button class="chip" data-example="Crie um conversor de moedas">Conversor de moedas</button>
+      <button class="chip" data-example="Crie um cronômetro Pomodoro">Pomodoro</button>
+    </div>
+    <button class="btn-primary" id="btnGerar">
+      <span class="spinner" id="spinner" hidden></span>
+      <span id="btnGerarLabel">Gerar aplicativo</span>
+    </button>
+
+    <!-- ===================== BARRA DE ETAPAS ===================== -->
+    <div class="stage-bar" id="stageBar" hidden>
+      <div class="stage-bar__step" id="stagePlanejar">
+        <span class="stage-bar__dot"></span>
+        <span class="stage-bar__label">Planejando</span>
+      </div>
+      <div class="stage-bar__line"></div>
+      <div class="stage-bar__step" id="stageCriar">
+        <span class="stage-bar__dot"></span>
+        <span class="stage-bar__label">Criando</span>
+      </div>
+    </div>
+    <ul class="plano-list" id="planoList" hidden></ul>
+
+    <p class="bench__status" id="status"></p>
+    <div class="bench__history">
+      <p class="history__label">Histórico</p>
+      <ul class="history__list" id="historyList"></ul>
+    </div>
+    <div class="bench__footer">Oficina v1.0</div>
+  </aside>
+  <!-- ===================== PALCO / PREVIEW ===================== -->
+  <main class="stage">
+    <div class="stage__bar">
+      <div class="stage__tabs">
+        <button class="tab is-active" data-view="preview">Prévia</button>
+        <button class="tab" data-view="code">Código</button>
+      </div>
+      <div class="stage__devices">
+        <button class="device is-active" data-width="100%" title="Desktop">Desktop</button>
+        <button class="device" data-width="768px" title="Tablet">Tablet</button>
+        <button class="device" data-width="375px" title="Celular">Celular</button>
+      </div>
+      <div class="stage__actions">
+        <button class="btn-ghost" id="btnCopiar" disabled>Copiar código</button>
+        <button class="btn-ghost" id="btnBaixar" disabled>Baixar .html</button>
+        <button class="btn-secondary" id="btnSalvar" disabled>Salvar na Oficina</button>
+      </div>
+    </div>
+    <div class="stage__context">
+      <div><span class="context__label">ESTÚDIO</span><strong>Seu aplicativo, em tempo real</strong></div>
+      <span class="context__hint">Descreva. Gere. Refine.</span>
+    </div>
+    <div class="stage__viewport">
+      <div class="frame-wrap" id="frameWrap">
+        <iframe id="previewFrame" hidden></iframe>
+        <pre class="code-view" id="codeView" hidden><code id="codeViewText"></code></pre>
+      </div>
+      <div class="empty-state" id="emptyState">
+        <p><strong>Nenhum aplicativo gerado ainda</strong></p>
+        <p class="empty-state__sub">Descreva o que você quer criar na bancada ao lado e clique em "Gerar aplicativo".</p>
+      </div>
+    </div>
+    <div class="stage__refine">
+      <span class="refine__spark">✦</span>
+      <input id="refineInput" type="text" placeholder="Peça uma alteração no app gerado..." autocomplete="off">
+      <button class="btn-secondary" id="btnRefinar" disabled>Aplicar alteração</button>
+    </div>
+  </main>
+</div>
+
+<!-- ===================== JANELA DE LOGIN / CADASTRO ===================== -->
+<div class="modal-overlay" id="authModalOverlay" hidden>
+  <div class="auth-modal" id="authModal">
+    <button class="auth-modal__close" id="closeAuthModal">×</button>
+    <div class="auth-tabs">
+      <button class="auth-tab is-active" id="authTabLogin">Entrar</button>
+      <button class="auth-tab" id="authTabSignup">Criar conta</button>
+    </div>
+    <form id="formLogin">
+      <div class="auth-field"><input type="email" id="loginEmail" placeholder="Email" required></div>
+      <div class="auth-field"><input type="password" id="loginPassword" placeholder="Senha" required></div>
+      <p class="auth-error" id="loginError"></p>
+      <button class="btn-primary auth-submit" type="submit">Entrar</button>
+    </form>
+    <form id="formSignup" hidden>
+      <div class="auth-field"><input type="text" id="signupName" placeholder="Seu nome"></div>
+      <div class="auth-field"><input type="email" id="signupEmail" placeholder="Email" required></div>
+      <div class="auth-field"><input type="password" id="signupPassword" placeholder="Crie uma senha" required></div>
+      <p class="auth-error" id="signupError"></p>
+      <button class="btn-primary auth-submit" type="submit">Criar conta grátis</button>
+    </form>
+  </div>
+</div>
+
+<script src="script.js"></script>
+<script src="conta.js"></script>
+</body>
+</html>
