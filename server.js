@@ -26,7 +26,7 @@ const app = express();
 const PORT = process.env.PORT || 10000;
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { files: 10, fileSize: 15 * 1024 * 1024 },
+  limits: { files: 10, fileSize: 50 * 1024 * 1024 },
 });
 
 const keys = getApiKeys();
@@ -110,7 +110,7 @@ app.post('/api/files/extract', (req, res, next) => {
 app.use('/api/files/extract', (error, req, res, next) => {
   if (!error) return next();
   const message = error.code === 'LIMIT_FILE_SIZE'
-    ? 'O arquivo é maior que o limite de 15 MB.'
+    ? 'O arquivo é maior que o limite de 50 MB.'
     : error.code === 'LIMIT_FILE_COUNT'
       ? 'Você pode enviar no máximo 10 arquivos por vez.'
       : error.message || 'Não foi possível receber o arquivo.';

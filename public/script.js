@@ -220,7 +220,7 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       data = JSON.parse(responseText);
     } catch {
-      throw new Error(`O servidor respondeu com um formato inesperado (HTTP ${response.status}).`);
+      throw new Error(`O servidor respondeu com um formato inesperado (HTTP ${response.status}). Verifique se o arquivo tem até 50 MB.`);
     }
     if (!response.ok) throw new Error(data.error || 'Não foi possível ler os anexos.');
     return (data.documents || []).map((document) => {
