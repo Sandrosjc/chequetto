@@ -215,7 +215,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const formData = new FormData();
     state.attachedFiles.forEach((file) => formData.append('files', file));
     const response = await fetch('/api/files/extract', { method: 'POST', body: formData });
-    const data = await response.json();
+    const responseText = await response.text();
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch {
+      throw new Error(`O servidor respondeu com um formato inesperado (HTTP ${response.status}).`);
+    }
     if (!response.ok) throw new Error(data.error || 'Não foi possível ler os anexos.');
     return (data.documents || []).map((document) => {
       if (!document.readable) return `Arquivo anexado: ${document.name} (${document.message})`;

@@ -64,7 +64,12 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', keysLoaded: keys.length });
 });
 
-app.post('/api/files/extract', upload.array('files', 10), async (req, res) => {
+app.post('/api/files/extract', (req, res, next) => {
+  upload.array('files', 10)(req, res, (error) => {
+    if (error) return next(error);
+    next();
+  });
+}, async (req, res) => {
   try {
     const documents = await Promise.all((req.files || []).map(async (file) => {
       const extension = path.extname(file.originalname).toLowerCase();
@@ -100,6 +105,16 @@ app.post('/api/files/extract', upload.array('files', 10), async (req, res) => {
   } catch (error) {
     res.status(400).json({ error: error.message || 'Não foi possível ler os arquivos.' });
   }
+});
+
+app.use('/api/files/extract', (error, req, res, next) => {
+  if (!error) return next();
+  const message = error.code === 'LIMIT_FILE_SIZE'
+    ? 'O arquivo é maior que o limite de 15 MB.'
+    : error.code === 'LIMIT_FILE_COUNT'
+      ? 'Você pode enviar no máximo 10 arquivos por vez.'
+      : error.message || 'Não foi possível receber o arquivo.';
+  res.status(400).json({ error: message });
 });
 
 // ---------- Auth ----------
