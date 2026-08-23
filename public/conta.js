@@ -15,10 +15,17 @@ document.addEventListener('DOMContentLoaded', () => {
     signupEmail: document.getElementById('signupEmail'),
     signupPassword: document.getElementById('signupPassword'),
     signupError: document.getElementById('signupError'),
+    socialLoginNote: document.getElementById('socialLoginNote'),
+    planNote: document.getElementById('planNote'),
     closeModal: document.getElementById('closeAuthModal'),
   };
 
   let currentUser = null;
+
+  window.chequettoAuth = {
+    isAuthenticated: () => !!currentUser,
+    openLogin: () => openModal(),
+  };
 
   async function fetchMe() {
     try {
@@ -83,6 +90,21 @@ document.addEventListener('DOMContentLoaded', () => {
   el.closeModal?.addEventListener('click', closeModal);
   el.modalOverlay?.addEventListener('click', (e) => {
     if (e.target === el.modalOverlay) closeModal();
+  });
+
+  document.querySelectorAll('[data-provider]').forEach((button) => {
+    button.addEventListener('click', () => {
+      el.socialLoginNote.textContent = `Login com ${button.dataset.provider} precisa ser conectado nas credenciais OAuth.`;
+    });
+  });
+
+  document.querySelectorAll('[data-plan]').forEach((button) => {
+    button.addEventListener('click', () => {
+      document.querySelectorAll('[data-plan]').forEach((plan) => plan.classList.remove('is-selected'));
+      button.classList.add('is-selected');
+      el.planNote.textContent = `Plano ${button.dataset.plan} selecionado. Crie sua conta para continuar.`;
+      switchTab('signup');
+    });
   });
 
   el.formLogin?.addEventListener('submit', async (e) => {

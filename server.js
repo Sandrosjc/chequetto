@@ -167,7 +167,7 @@ app.get('/api/me', requireAuth, (req, res) => {
 
 // ---------- Geração com etapas em tempo real (Server-Sent Events) ----------
 
-app.get('/generate/stream', async (req, res) => {
+app.get('/generate/stream', requireAuth, async (req, res) => {
   const prompt = req.query.prompt;
   if (!prompt) {
     res.status(400).json({ error: 'Prompt não fornecido' });
@@ -193,7 +193,7 @@ app.get('/generate/stream', async (req, res) => {
 });
 
 // mantém a rota antiga funcionando também, sem streaming, pra compatibilidade
-app.post('/generate', async (req, res) => {
+app.post('/generate', requireAuth, async (req, res) => {
   try {
     const { prompt } = req.body;
     if (!prompt) {
@@ -207,7 +207,7 @@ app.post('/generate', async (req, res) => {
   }
 });
 
-app.post('/refine', async (req, res) => {
+app.post('/refine', requireAuth, async (req, res) => {
   const { html, pedido } = req.body || {};
   if (!html || !pedido) return res.status(400).json({ error: 'Aplicativo e pedido de alteração são obrigatórios' });
   try {

@@ -1,5 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
   const WORKSPACE_STORAGE_KEY = 'chequetto_workspace_state_v1';
+  const SAVED_PROJECTS_STORAGE_KEY = 'chequetto_saved_projects_v1';
   const el = {
     prompt: document.getElementById('prompt'),
     btnGerar: document.getElementById('btnGerar'),
@@ -52,6 +53,17 @@ document.addEventListener('DOMContentLoaded', () => {
       }));
     } catch (error) {
       console.warn('Não foi possível salvar o workspace localmente.', error);
+    }
+  }
+
+  function persistSavedProject(project) {
+    try {
+      const saved = JSON.parse(localStorage.getItem(SAVED_PROJECTS_STORAGE_KEY) || '[]');
+      const next = saved.filter((item) => item.id !== project.id);
+      next.unshift(project);
+      localStorage.setItem(SAVED_PROJECTS_STORAGE_KEY, JSON.stringify(next.slice(0, 30)));
+    } catch (error) {
+      console.warn('Não foi possível guardar o projeto localmente.', error);
     }
   }
 
@@ -132,6 +144,9 @@ document.addEventListener('DOMContentLoaded', () => {
   el.prompt?.addEventListener('input', () => {
     state.promptDraft = el.prompt.value;
     persistWorkspace();
+    if (state.promptDraft && !window.chequettoAuth?.isAuthenticated()) {
+      window.chequettoAuth?.openLogin();
+    }
   });
 
   fetch('/api/health')
@@ -153,6 +168,10 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   document.getElementById('aiTips')?.addEventListener('click', (event) => {
+    if (!window.chequettoAuth?.isAuthenticated()) {
+      window.chequettoAuth?.openLogin();
+      return;
+    }
     const tip = event.target.closest('[data-tip]')?.getAttribute('data-tip');
     if (!tip || !el.prompt) return;
     el.prompt.value = el.prompt.value.trim()
@@ -162,6 +181,11 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   el.fileAttach?.addEventListener('change', () => {
+    if (!window.chequettoAuth?.isAuthenticated()) {
+      window.chequettoAuth?.openLogin();
+      el.fileAttach.value = '';
+      return;
+    }
     addAttachedFiles(el.fileAttach.files);
     el.fileAttach.value = '';
   });
@@ -219,6 +243,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (el.btnMic) {
       el.btnMic.addEventListener('click', () => {
+        if (!window.chequettoAuth?.isAuthenticated()) {
+          window.chequettoAuth?.openLogin();
+          return;
+        }
         if (gravando) {
           recognition.stop();
           return;
@@ -272,6 +300,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (el.btnGerar) {
     el.btnGerar.addEventListener('click', async () => {
+      if (!window.chequettoAuth?.isAuthenticated()) {
+        window.chequettoAuth?.openLogin();
+        if (el.status) el.status.textContent = 'Entre ou crie sua conta para gerar o aplicativo.';
+        return;
+      }
       const basePrompt = el.prompt ? el.prompt.value.trim() : '';
       if (!basePrompt && !state.attachedFiles.length) {
         alert('Por favor, descreva o aplicativo que você quer criar.');
@@ -464,7 +497,16 @@ document.addEventListener('DOMContentLoaded', () => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ prompt: state.promptAtual, plano: state.planoAtual, html: state.codigoAtual }),
         });
-        if (!res.ok) throw new Error('Falha ao salvar');
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Falha ao salvar');
+        persistSavedProject({
+          id: data.project?.id || `local-${Date.now()}`,
+          prompt: state.promptAtual,
+          nome: data.project?.nome || state.promptAtual.slice(0, 60),
+          html: state.codigoAtual,
+          plano: state.planoAtual,
+        });
+        persistWorkspace();
         el.btnSalvar.textContent = 'Salvo ✓';
         setTimeout(() => { el.btnSalvar.textContent = original; el.btnSalvar.disabled = false; }, 1800);
       } catch {

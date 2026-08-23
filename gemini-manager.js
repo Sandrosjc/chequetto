@@ -41,7 +41,10 @@ const INSTRUCAO_GLOBAL = `REGRAS PERMANENTES DA PLATAFORMA:
 1. Ao atualizar, corrigir ou ajustar um aplicativo/site existente, preserve todo o código e comportamento que já funcionam. Faça somente as alterações necessárias no local correto; nunca reescreva o projeto inteiro do zero.
 2. O projeto deve manter seu estado e dados de forma persistente. Implemente salvamento automático e restauração após atualização, fechamento ou reinicialização da página, sem perder o progresso do usuário.
   Para dados do app no navegador, use localStorage ou IndexedDB: salve cada alteração relevante e restaure o estado assim que a página abrir.
-3. Essas regras fazem parte do produto e devem ser aplicadas em todos os aplicativos e sites gerados.`;
+3. Siga exatamente o que foi pedido pelo usuário. Não invente funcionalidades, telas, textos ou mudanças que não foram solicitadas.
+4. Se o trabalho for grande, organize a implementação em blocos coerentes, revise cada bloco e corrija os erros antes de entregar. A resposta final ainda deve ser um único HTML completo, autocontido e funcionando.
+5. Antes de entregar, confira sintaxe, referências entre HTML/CSS/JavaScript e se todas as funcionalidades solicitadas estão presentes.
+6. Essas regras fazem parte do produto e devem ser aplicadas em todos os aplicativos e sites gerados.`;
 
 const INSTRUCAO_PLANO = `Você é o planejador do Oficina, um gerador de mini-aplicativos web.
 Dado o pedido do usuário, responda com uma lista curta (3 a 5 itens) em português, cada item em uma linha
