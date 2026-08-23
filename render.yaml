@@ -8,3 +8,5 @@ services:
     envVars:
       - key: GEMINI_API_KEYS
         sync: false
+      - key: JWT_SECRET
+        generateValue: true
