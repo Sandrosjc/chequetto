@@ -1,0 +1,10 @@
+services:
+  - type: web
+    name: chequetto
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: GEMINI_API_KEYS
+        sync: false
