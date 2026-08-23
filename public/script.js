@@ -1,4 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
+  const WORKSPACE_STORAGE_KEY = 'chequetto_workspace_state_v1';
   const el = {
     prompt: document.getElementById('prompt'),
     btnGerar: document.getElementById('btnGerar'),
@@ -34,10 +35,44 @@ document.addEventListener('DOMContentLoaded', () => {
   let state = {
     codigoAtual: '',
     promptAtual: '',
+    promptDraft: '',
     planoAtual: [],
     historico: [],
     attachedFiles: []
   };
+
+  function persistWorkspace() {
+    try {
+      localStorage.setItem(WORKSPACE_STORAGE_KEY, JSON.stringify({
+        codigoAtual: state.codigoAtual,
+        promptAtual: state.promptAtual,
+        promptDraft: el.prompt?.value || state.promptDraft,
+        planoAtual: state.planoAtual,
+        historico: state.historico.slice(-30),
+      }));
+    } catch (error) {
+      console.warn('Não foi possível salvar o workspace localmente.', error);
+    }
+  }
+
+  function restoreWorkspace() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(WORKSPACE_STORAGE_KEY) || 'null');
+      if (!saved) return;
+      state = {
+        ...state,
+        ...saved,
+        historico: Array.isArray(saved.historico) ? saved.historico : [],
+        planoAtual: Array.isArray(saved.planoAtual) ? saved.planoAtual : [],
+      };
+      if (el.prompt) el.prompt.value = state.promptDraft || '';
+      if (state.codigoAtual) showGeneratedCode(state.codigoAtual, state.promptAtual);
+      renderPlano(state.planoAtual);
+      renderHistory();
+    } catch (error) {
+      console.warn('Não foi possível restaurar o workspace local.', error);
+    }
+  }
 
   function renderAttachedFiles() {
     if (!el.attachedFiles) return;
@@ -91,7 +126,13 @@ document.addEventListener('DOMContentLoaded', () => {
     if (el.btnSalvar) el.btnSalvar.disabled = false;
     if (el.btnRefinar) el.btnRefinar.disabled = false;
     state.promptAtual = promptText;
+    persistWorkspace();
   }
+
+  el.prompt?.addEventListener('input', () => {
+    state.promptDraft = el.prompt.value;
+    persistWorkspace();
+  });
 
   fetch('/api/health')
     .then(res => res.json())
@@ -274,6 +315,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
           state.historico.push({ prompt: promptText, code: data.html, plano: state.planoAtual });
           renderHistory();
+          persistWorkspace();
 
           if (el.status) el.status.textContent = 'Aplicativo gerado com sucesso!';
           setLoading(false);
@@ -372,6 +414,7 @@ document.addEventListener('DOMContentLoaded', () => {
       showGeneratedCode(data.code, state.promptAtual + ' / ' + pedido);
       state.historico.push({ prompt: 'Ajuste: ' + pedido, code: data.code, plano: state.planoAtual });
       renderHistory();
+      persistWorkspace();
       if (el.refineInput) el.refineInput.value = '';
       if (el.status) el.status.textContent = 'Alteração aplicada com sucesso!';
     } catch (error) {
@@ -385,6 +428,8 @@ document.addEventListener('DOMContentLoaded', () => {
   el.refineInput?.addEventListener('keydown', (event) => {
     if (event.key === 'Enter') el.btnRefinar?.click();
   });
+
+  restoreWorkspace();
 
   if (el.btnCopiar) {
     el.btnCopiar.addEventListener('click', async () => {

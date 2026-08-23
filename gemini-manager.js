@@ -37,6 +37,12 @@ function extrairLista(texto) {
   return linhas.length > 0 ? linhas.slice(0, 5) : [texto.trim().slice(0, 140)];
 }
 
+const INSTRUCAO_GLOBAL = `REGRAS PERMANENTES DA PLATAFORMA:
+1. Ao atualizar, corrigir ou ajustar um aplicativo/site existente, preserve todo o código e comportamento que já funcionam. Faça somente as alterações necessárias no local correto; nunca reescreva o projeto inteiro do zero.
+2. O projeto deve manter seu estado e dados de forma persistente. Implemente salvamento automático e restauração após atualização, fechamento ou reinicialização da página, sem perder o progresso do usuário.
+  Para dados do app no navegador, use localStorage ou IndexedDB: salve cada alteração relevante e restaure o estado assim que a página abrir.
+3. Essas regras fazem parte do produto e devem ser aplicadas em todos os aplicativos e sites gerados.`;
+
 const INSTRUCAO_PLANO = `Você é o planejador do Oficina, um gerador de mini-aplicativos web.
 Dado o pedido do usuário, responda com uma lista curta (3 a 5 itens) em português, cada item em uma linha
 começando com "-", descrevendo os passos que você vai seguir para construir o app (ex: "Criar a estrutura da lista de tarefas",
@@ -71,7 +77,7 @@ async function gerarComGemini(prompt, history = [], onStep = () => {}) {
   onStep({ stage: 'planejando', message: 'Analisando o que você pediu...' });
   for (const key of keys) {
     try {
-      const textoPlano = await chamarGemini(key, `${INSTRUCAO_PLANO}\n\nPedido do usuário: ${prompt}`);
+      const textoPlano = await chamarGemini(key, `${INSTRUCAO_GLOBAL}\n\n${INSTRUCAO_PLANO}\n\nPedido do usuário: ${prompt}`);
       plano = extrairLista(textoPlano);
       break;
     } catch (err) {
@@ -88,7 +94,7 @@ async function gerarComGemini(prompt, history = [], onStep = () => {}) {
   onStep({ stage: 'criando', message: 'Escrevendo o código do aplicativo...' });
   for (const key of keys) {
     try {
-      const promptFinal = `${INSTRUCAO_CODIGO}\n\nPedido do usuário: ${prompt}\n\nPlano a seguir:\n${plano.join('\n')}`;
+      const promptFinal = `${INSTRUCAO_GLOBAL}\n\n${INSTRUCAO_CODIGO}\n\nPedido do usuário: ${prompt}\n\nPlano a seguir:\n${plano.join('\n')}`;
       const textoBruto = await chamarGemini(key, promptFinal);
       const html = extrairHtml(textoBruto);
       onStep({ stage: 'concluido', message: 'Aplicativo pronto!' });
@@ -110,7 +116,9 @@ async function refinarComGemini(htmlAtual, pedido, onStep = () => {}) {
   const keys = getApiKeys();
   if (keys.length === 0) throw new Error('Nenhuma chave de API configurada.');
 
-  const instrucao = `${INSTRUCAO_CODIGO}
+  const instrucao = `${INSTRUCAO_GLOBAL}
+
+${INSTRUCAO_CODIGO}
 
 Você está refinando um aplicativo existente. Preserve tudo que já funciona e aplique somente as mudanças pedidas.
 Garanta que o resultado continue sendo um documento HTML completo e autocontido.
