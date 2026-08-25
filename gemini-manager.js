@@ -67,7 +67,7 @@ async function chamarGemini(key, promptFinal) {
 }
 
 // Gera o plano (etapa 1) e o código (etapa 2), narrando cada etapa via onStep(texto)
-async function gerarComGemini(prompt, history = [], onStep = () => {}) {
+async function gerarComGemini(prompt, history = [], onStep = () => {}, language = 'pt') {
   const keys = getApiKeys();
   if (keys.length === 0) {
     throw new Error('Nenhuma chave de API configurada.');
@@ -80,7 +80,7 @@ async function gerarComGemini(prompt, history = [], onStep = () => {}) {
   onStep({ stage: 'planejando', message: 'Analisando o que você pediu...' });
   for (const key of keys) {
     try {
-      const textoPlano = await chamarGemini(key, `${INSTRUCAO_GLOBAL}\n\n${INSTRUCAO_PLANO}\n\nPedido do usuário: ${prompt}`);
+      const textoPlano = await chamarGemini(key, `${INSTRUCAO_GLOBAL}\n\nIdioma de resposta: ${language}. Gere o plano neste idioma.\n${INSTRUCAO_PLANO}\n\nPedido do usuário: ${prompt}`);
       plano = extrairLista(textoPlano);
       break;
     } catch (err) {
@@ -97,7 +97,7 @@ async function gerarComGemini(prompt, history = [], onStep = () => {}) {
   onStep({ stage: 'criando', message: 'Escrevendo o código do aplicativo...' });
   for (const key of keys) {
     try {
-      const promptFinal = `${INSTRUCAO_GLOBAL}\n\n${INSTRUCAO_CODIGO}\n\nPedido do usuário: ${prompt}\n\nPlano a seguir:\n${plano.join('\n')}`;
+      const promptFinal = `${INSTRUCAO_GLOBAL}\n\nIdioma obrigatório do aplicativo e dos textos: ${language}.\n${INSTRUCAO_CODIGO}\n\nPedido do usuário: ${prompt}\n\nPlano a seguir:\n${plano.join('\n')}`;
       const textoBruto = await chamarGemini(key, promptFinal);
       const html = extrairHtml(textoBruto);
       onStep({ stage: 'concluido', message: 'Aplicativo pronto!' });

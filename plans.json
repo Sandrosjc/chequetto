@@ -1,0 +1,7 @@
+{
+  "Gratis": { "name": "Grátis", "amount": 0, "currency": "BRL", "interval": "forever", "label": "R$ 0", "frequency": "sempre" },
+  "Mensal": { "name": "Mensal", "amount": 29.90, "currency": "BRL", "interval": "month", "label": "R$ 29,90", "frequency": "por mês", "checkoutEnv": "HOTMART_CHECKOUT_MENSAL" },
+  "Trimestral": { "name": "Trimestral", "amount": 79.90, "currency": "BRL", "interval": "quarter", "label": "R$ 79,90", "frequency": "por trimestre", "checkoutEnv": "HOTMART_CHECKOUT_TRIMESTRAL" },
+  "Anual": { "name": "Anual", "amount": 299.90, "currency": "BRL", "interval": "year", "label": "R$ 299,90", "frequency": "por ano", "checkoutEnv": "HOTMART_CHECKOUT_ANUAL" },
+  "Vitalício": { "name": "Vitalício", "amount": 799.90, "currency": "BRL", "interval": "lifetime", "label": "R$ 799,90", "frequency": "pagamento único", "checkoutEnv": "HOTMART_CHECKOUT_VITALICIO" }
+}

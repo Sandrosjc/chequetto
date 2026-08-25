@@ -1,4 +1,5 @@
-// conta.js — controla login, cadastro e exibição de créditos na Oficina
+// conta.js — controla login, cadastro, seleção de plano e pagamento
+
 document.addEventListener('DOMContentLoaded', () => {
   const el = {
     accountArea: document.getElementById('accountArea'),
@@ -18,13 +19,138 @@ document.addEventListener('DOMContentLoaded', () => {
     socialLoginNote: document.getElementById('socialLoginNote'),
     planNote: document.getElementById('planNote'),
     closeModal: document.getElementById('closeAuthModal'),
+    checkoutModalOverlay: document.getElementById('checkoutModalOverlay'),
+    checkoutPlanName: document.getElementById('checkoutPlanName'),
+    checkoutPlanValue: document.getElementById('checkoutPlanValue'),
+    checkoutPlanFrequency: document.getElementById('checkoutPlanFrequency'),
+    closeCheckoutModal: document.getElementById('closeCheckoutModal'),
+    btnConfirmCheckout: document.getElementById('btnConfirmCheckout'),
+  };
+
+  const planCatalog = {
+    Grátis: { value: 'R$ 0', frequency: 'sempre' },
+    Mensal: { value: 'R$ 29,90', frequency: 'por mês' },
+    Trimestral: { value: 'R$ 79,90', frequency: 'por trimestre' },
+    Anual: { value: 'R$ 299,90', frequency: 'por ano' },
+    Vitalício: { value: 'R$ 799,90', frequency: 'pagamento único' },
   };
 
   let currentUser = null;
+  let pendingAction = null;
+  let selectedPlan = 'Mensal';
+
+  function startOfferCountdown() {
+    const countdown = document.getElementById('offerCountdown');
+    if (!countdown) return;
+    const key = 'chequetto_lifetime_offer_ends_v1';
+    let endsAt = Number(localStorage.getItem(key));
+    if (!endsAt || endsAt <= Date.now()) {
+      endsAt = Date.now() + 7 * 24 * 60 * 60 * 1000;
+      localStorage.setItem(key, String(endsAt));
+    }
+    const update = () => {
+      const remaining = Math.max(0, endsAt - Date.now());
+      const days = Math.floor(remaining / 86400000);
+      const hours = Math.floor((remaining % 86400000) / 3600000);
+      const minutes = Math.floor((remaining % 3600000) / 60000);
+      const seconds = Math.floor((remaining % 60000) / 1000);
+      countdown.textContent = `${days}d ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+    };
+    update();
+    setInterval(update, 1000);
+  }
+
+  function renderCheckoutSummary() {
+    const details = planCatalog[selectedPlan] || planCatalog.Mensal;
+    if (el.checkoutPlanName) el.checkoutPlanName.textContent = selectedPlan;
+    if (el.checkoutPlanValue) el.checkoutPlanValue.textContent = details.value;
+    if (el.checkoutPlanFrequency) el.checkoutPlanFrequency.textContent = details.frequency;
+    document.querySelectorAll('[data-checkout-plan]').forEach((button) => {
+      button.classList.toggle('is-selected', button.dataset.checkoutPlan === selectedPlan);
+    });
+  }
+
+  function continuePendingAction() {
+    if (!pendingAction) return;
+    const next = pendingAction;
+    pendingAction = null;
+    next();
+  }
+
+  function renderAccountArea() {
+    if (!el.accountArea) return;
+
+    if (currentUser) {
+      const creditsLabel = currentUser.unlimited ? '∞' : (currentUser.credits ?? 0);
+      el.accountArea.innerHTML = `
+        <div class="account-chip">
+          <span class="account-chip__credits" title="Créditos disponíveis">⚡ ${creditsLabel}</span>
+          <span class="account-chip__email">${currentUser.email}</span>
+          <button class="btn-ghost btn-ghost--small" id="btnLogout">Sair</button>
+        </div>
+      `;
+      document.getElementById('btnLogout')?.addEventListener('click', async () => {
+        await fetch('/api/auth/logout', { method: 'POST' });
+        currentUser = null;
+        renderAccountArea();
+      });
+    } else {
+      el.accountArea.innerHTML = `
+        <div class="account-chip account-chip--guest">
+          <span class="account-chip__credits" title="Créditos grátis">⚡ 20</span>
+          <button class="btn-secondary btn-secondary--small" id="btnAbrirLogin">Entrar</button>
+        </div>
+      `;
+      document.getElementById('btnAbrirLogin')?.addEventListener('click', openModal);
+    }
+  }
+
+  function openModal() {
+    if (!el.modalOverlay) return;
+    el.modalOverlay.hidden = false;
+    switchTab('login');
+  }
+
+  function closeModal() {
+    if (el.modalOverlay) el.modalOverlay.hidden = true;
+    if (el.loginError) el.loginError.textContent = '';
+    if (el.signupError) el.signupError.textContent = '';
+  }
+
+  function openCheckout(planName = selectedPlan) {
+    selectedPlan = planName || 'Mensal';
+    renderCheckoutSummary();
+    if (el.checkoutModalOverlay) el.checkoutModalOverlay.hidden = false;
+  }
+
+  function closeCheckout() {
+    if (el.checkoutModalOverlay) el.checkoutModalOverlay.hidden = true;
+  }
+
+  function switchTab(which) {
+    const isLogin = which === 'login';
+    if (el.tabLogin) el.tabLogin.classList.toggle('is-active', isLogin);
+    if (el.tabSignup) el.tabSignup.classList.toggle('is-active', !isLogin);
+    if (el.formLogin) el.formLogin.hidden = !isLogin;
+    if (el.formSignup) el.formSignup.hidden = isLogin;
+  }
+
+  function requireAuth(nextAction) {
+    if (currentUser) {
+      nextAction?.();
+      return true;
+    }
+    pendingAction = nextAction || null;
+    openModal();
+    return false;
+  }
 
   window.chequettoAuth = {
     isAuthenticated: () => !!currentUser,
     openLogin: () => openModal(),
+    requireAuth,
+    openCheckout,
+    refresh: fetchMe,
   };
 
   async function fetchMe() {
@@ -44,52 +170,22 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  function renderAccountArea() {
-    if (!el.accountArea) return;
-
-    if (currentUser) {
-      el.accountArea.innerHTML = `
-        <div class="account-chip">
-          <span class="account-chip__credits">⚡ ${currentUser.unlimited ? '∞' : currentUser.credits}</span>
-          <span class="account-chip__email">${currentUser.email}</span>
-          <button class="btn-ghost btn-ghost--small" id="btnLogout">Sair</button>
-        </div>
-      `;
-      document.getElementById('btnLogout')?.addEventListener('click', async () => {
-        await fetch('/api/auth/logout', { method: 'POST' });
-        currentUser = null;
-        renderAccountArea();
-      });
-    } else {
-      el.accountArea.innerHTML = `<button class="btn-secondary btn-secondary--small" id="btnAbrirLogin">Entrar</button>`;
-      document.getElementById('btnAbrirLogin')?.addEventListener('click', openModal);
-    }
-  }
-
-  function openModal() {
-    el.modalOverlay.hidden = false;
-    switchTab('login');
-  }
-
-  function closeModal() {
-    el.modalOverlay.hidden = true;
-    el.loginError.textContent = '';
-    el.signupError.textContent = '';
-  }
-
-  function switchTab(which) {
-    const isLogin = which === 'login';
-    el.tabLogin.classList.toggle('is-active', isLogin);
-    el.tabSignup.classList.toggle('is-active', !isLogin);
-    el.formLogin.hidden = !isLogin;
-    el.formSignup.hidden = isLogin;
-  }
-
   el.tabLogin?.addEventListener('click', () => switchTab('login'));
   el.tabSignup?.addEventListener('click', () => switchTab('signup'));
-  el.closeModal?.addEventListener('click', closeModal);
+  el.closeModal?.addEventListener('click', () => {
+    closeModal();
+    if (!currentUser && pendingAction) pendingAction = null;
+  });
   el.modalOverlay?.addEventListener('click', (e) => {
-    if (e.target === el.modalOverlay) closeModal();
+    if (e.target === el.modalOverlay) {
+      closeModal();
+      if (!currentUser && pendingAction) pendingAction = null;
+    }
+  });
+
+  el.closeCheckoutModal?.addEventListener('click', () => closeCheckout());
+  el.checkoutModalOverlay?.addEventListener('click', (e) => {
+    if (e.target === el.checkoutModalOverlay) closeCheckout();
   });
 
   document.querySelectorAll('[data-provider]').forEach((button) => {
@@ -102,9 +198,62 @@ document.addEventListener('DOMContentLoaded', () => {
     button.addEventListener('click', () => {
       document.querySelectorAll('[data-plan]').forEach((plan) => plan.classList.remove('is-selected'));
       button.classList.add('is-selected');
-      el.planNote.textContent = `Plano ${button.dataset.plan} selecionado. Crie sua conta para continuar.`;
-      switchTab('signup');
+      const planName = button.dataset.plan || 'Mensal';
+      selectedPlan = planName;
+      const freeText = planName === 'Grátis'
+        ? 'Plano Grátis: 20 créditos, ideal para testar e criar até 1 app completo.'
+        : `Plano ${planName} selecionado. ${currentUser ? 'Continue para o pagamento.' : 'Crie sua conta para continuar.'}`;
+      el.planNote.textContent = freeText;
+
+      if (planName === 'Grátis') {
+        pendingAction = () => openCheckout(planName);
+        openModal();
+        switchTab('signup');
+        return;
+      }
+
+      if (!currentUser) {
+        pendingAction = () => openCheckout(planName);
+        openModal();
+        switchTab('signup');
+        return;
+      }
+
+      openCheckout(planName);
     });
+  });
+
+  document.querySelectorAll('[data-checkout-plan]').forEach((button) => {
+    button.addEventListener('click', () => {
+      selectedPlan = button.dataset.checkoutPlan || 'Mensal';
+      renderCheckoutSummary();
+    });
+  });
+
+  el.btnConfirmCheckout?.addEventListener('click', async () => {
+    if (!currentUser) {
+      closeCheckout();
+      openModal();
+      return;
+    }
+
+    el.btnConfirmCheckout.disabled = true;
+    try {
+      const res = await fetch('/api/billing/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ planId: selectedPlan }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Não foi possível iniciar o pagamento.');
+      closeCheckout();
+      window.open(data.checkoutUrl, '_blank', 'noopener');
+      if (el.planNote) el.planNote.textContent = 'Checkout Hotmart aberto. Seu acesso será liberado após a confirmação do pagamento.';
+    } catch (err) {
+      if (el.planNote) el.planNote.textContent = err.message;
+    } finally {
+      el.btnConfirmCheckout.disabled = false;
+    }
   });
 
   el.formLogin?.addEventListener('submit', async (e) => {
@@ -121,6 +270,7 @@ document.addEventListener('DOMContentLoaded', () => {
       currentUser = data.user;
       renderAccountArea();
       closeModal();
+      continuePendingAction();
     } catch (err) {
       el.loginError.textContent = err.message;
     }
@@ -148,10 +298,13 @@ document.addEventListener('DOMContentLoaded', () => {
       currentUser = data.user;
       renderAccountArea();
       closeModal();
+      continuePendingAction();
     } catch (err) {
       el.signupError.textContent = err.message;
     }
   });
 
+  renderCheckoutSummary();
+  startOfferCountdown();
   fetchMe();
 });

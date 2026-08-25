@@ -43,6 +43,19 @@ CREATE TABLE IF NOT EXISTS projects (
   nome TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS subscriptions (
+  id TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL,
+  plan_id TEXT NOT NULL,
+  amount REAL NOT NULL,
+  currency TEXT NOT NULL DEFAULT 'BRL',
+  status TEXT NOT NULL DEFAULT 'pending',
+  gateway TEXT,
+  gateway_checkout_id TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
 `);
 
 function newId() {
@@ -163,8 +176,21 @@ function getProjectById(id) {
 
 function listProjectsByUser(userId) {
   return db
-    .prepare('SELECT id, prompt, nome, created_at FROM projects WHERE user_id = ? ORDER BY created_at DESC')
-    .all(userId);
+    .prepare('SELECT id, prompt, plano, html, nome, created_at FROM projects WHERE user_id = ? ORDER BY created_at DESC')
+    .all(userId)
+    .map((project) => ({
+      ...project,
+      plano: JSON.parse(project.plano || '[]'),
+    }));
+}
+
+function createPendingSubscription({ userId, planId, amount, currency, gateway }) {
+  const id = newId();
+  db.prepare(
+    `INSERT INTO subscriptions (id, user_id, plan_id, amount, currency, gateway)
+     VALUES (?, ?, ?, ?, ?, ?)`
+  ).run(id, userId, planId, amount, currency, gateway || null);
+  return db.prepare('SELECT * FROM subscriptions WHERE id = ?').get(id);
 }
 
 module.exports = {
@@ -180,4 +206,5 @@ module.exports = {
   saveProject,
   getProjectById,
   listProjectsByUser,
+  createPendingSubscription,
 };

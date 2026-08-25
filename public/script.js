@@ -141,12 +141,32 @@ document.addEventListener('DOMContentLoaded', () => {
     persistWorkspace();
   }
 
+  const rotatingKeywords = ['ideias em aplicativos', 'processos em automações', 'problemas em soluções', 'planos em produtos reais', 'descrições em interfaces prontas'];
+  let rotatingKeywordIndex = 0;
+  const rotatingKeyword = document.getElementById('rotatingKeyword');
+  if (rotatingKeyword) {
+    setInterval(() => {
+      rotatingKeywordIndex = (rotatingKeywordIndex + 1) % rotatingKeywords.length;
+      rotatingKeyword.textContent = rotatingKeywords[rotatingKeywordIndex];
+    }, 2600);
+  }
+
+  let loginPromptGuard = false;
+
+  el.prompt?.addEventListener('focus', () => {
+    if (!window.chequettoAuth?.isAuthenticated() && !loginPromptGuard) {
+      loginPromptGuard = true;
+      window.chequettoAuth?.openLogin();
+      el.prompt?.blur();
+      setTimeout(() => {
+        loginPromptGuard = false;
+      }, 500);
+    }
+  });
+
   el.prompt?.addEventListener('input', () => {
     state.promptDraft = el.prompt.value;
     persistWorkspace();
-    if (state.promptDraft && !window.chequettoAuth?.isAuthenticated()) {
-      window.chequettoAuth?.openLogin();
-    }
   });
 
   fetch('/api/health')
@@ -326,7 +346,8 @@ document.addEventListener('DOMContentLoaded', () => {
       if (el.planoList) { el.planoList.innerHTML = ''; el.planoList.hidden = true; }
       setStage('planejando');
 
-      const source = new EventSource('/generate/stream?prompt=' + encodeURIComponent(promptText));
+      const language = window.chequettoI18n?.getLanguage?.() || 'pt';
+      const source = new EventSource('/generate/stream?prompt=' + encodeURIComponent(promptText) + '&lang=' + encodeURIComponent(language));
 
       source.onmessage = (event) => {
         const data = JSON.parse(event.data);
@@ -349,6 +370,10 @@ document.addEventListener('DOMContentLoaded', () => {
           state.historico.push({ prompt: promptText, code: data.html, plano: state.planoAtual });
           renderHistory();
           persistWorkspace();
+
+          if (window.chequettoAuth?.refresh) {
+            window.chequettoAuth.refresh();
+          }
 
           if (el.status) el.status.textContent = 'Aplicativo gerado com sucesso!';
           setLoading(false);
@@ -415,7 +440,7 @@ document.addEventListener('DOMContentLoaded', () => {
         state.historico.push({
           prompt: projeto.nome || projeto.prompt,
           code: projeto.html,
-          plano: projeto.plano || [],
+          plano: Array.isArray(projeto.plano) ? projeto.plano : [],
         });
       });
       renderHistory();
@@ -432,7 +457,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   el.btnRefinar?.addEventListener('click', async () => {
     const pedido = el.refineInput?.value.trim();
-    if (!pedido || !state.codigoAtual) return;
+    if (!pedido) return;
+    if (!state.codigoAtual) {
+      if (el.status) el.status.textContent = 'Gere um aplicativo antes de pedir uma alteração.';
+      return;
+    }
     el.btnRefinar.disabled = true;
     el.btnRefinar.textContent = 'Aplicando...';
     if (el.status) el.status.textContent = 'A IA está atualizando seu aplicativo...';
@@ -509,12 +538,22 @@ document.addEventListener('DOMContentLoaded', () => {
         persistWorkspace();
         el.btnSalvar.textContent = 'Salvo ✓';
         setTimeout(() => { el.btnSalvar.textContent = original; el.btnSalvar.disabled = false; }, 1800);
-      } catch {
+      } catch (error) {
+        if (error.message === 'Não autenticado') {
+          window.chequettoAuth?.openLogin();
+        }
         el.btnSalvar.textContent = 'Erro ao salvar';
         setTimeout(() => { el.btnSalvar.textContent = original; el.btnSalvar.disabled = false; }, 1800);
       }
     });
   }
+
+  const btnShareWhatsapp = document.getElementById('btnShareWhatsapp');
+  btnShareWhatsapp?.addEventListener('click', () => {
+    const text = encodeURIComponent('Olha esse app que eu gerei no Chequetto: https://chequetto.app');
+    const url = `https://wa.me/?text=${text}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  });
 
   if (el.tabs) {
     el.tabs.forEach(tab => {
