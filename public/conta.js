@@ -287,7 +287,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (!res.ok) throw new Error(data.error || 'Não foi possível iniciar o pagamento.');
       closeCheckout();
       window.open(data.checkoutUrl, '_blank', 'noopener');
-      if (el.planNote) el.planNote.textContent = 'Checkout Hotmart aberto. Seu acesso será liberado após a confirmação do pagamento.';
+      if (el.planNote) el.planNote.textContent = 'Checkout Asaas aberto. Seu acesso será liberado após a confirmação do pagamento.';
     } catch (err) {
       if (el.planNote) el.planNote.textContent = err.message;
     } finally {

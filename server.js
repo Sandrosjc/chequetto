@@ -19,6 +19,7 @@ const {
   getProjectById,
   listProjectsByUser,
   createPendingSubscription,
+  setUnlimited,
 } = require('./db');
 const { signUserToken, requireAuth, hashPassword, comparePassword } = require('./auth');
 const plans = require('./plans.json');
@@ -31,6 +32,7 @@ const upload = multer({
 });
 
 const keys = getApiKeys();
+const ASAAS_API_URL = process.env.ASAAS_API_URL || 'https://api.asaas.com/v3';
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: false }));
@@ -50,6 +52,29 @@ function publicUser(user) {
     unlimited: !!user.unlimited_credits,
     referralCode: user.referral_code,
   };
+}
+
+async function asaasRequest(endpoint, options = {}) {
+  if (!process.env.ASAAS_API_KEY) throw new Error('ASAAS_API_KEY não configurada no servidor.');
+  const response = await fetch(`${ASAAS_API_URL}${endpoint}`, {
+    ...options,
+    headers: {
+      accept: 'application/json',
+      'content-type': 'application/json',
+      access_token: process.env.ASAAS_API_KEY,
+      ...(options.headers || {}),
+    },
+  });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const detail = data.errors?.map((item) => item.description).join(', ');
+    throw new Error(detail || data.message || `Asaas respondeu com HTTP ${response.status}.`);
+  }
+  return data;
+}
+
+function asaasSubscriptionCycle(plan) {
+  return { month: 'MONTHLY', quarter: 'QUARTERLY', year: 'YEARLY' }[plan.interval];
 }
 
 // tenta pegar o usuário logado, sem exigir login (gerar app funciona sem conta também)
@@ -198,40 +223,60 @@ app.get('/api/me', requireAuth, (req, res) => {
   res.json({ user: publicUser(user), nextTier: invitesRequiredForNextTier(user) });
 });
 
-app.post('/api/billing/checkout', requireAuth, (req, res) => {
+app.post('/api/billing/checkout', requireAuth, async (req, res) => {
   const { planId } = req.body || {};
   const plan = plans[planId];
   if (!plan || planId === 'gratis') {
     return res.status(400).json({ error: 'Plano pago inválido.' });
   }
 
-  const isPromoActive = planId === 'Vitalício' && plan.promoAmount && plan.promoEndsAt
-    && Date.now() < Date.parse(plan.promoEndsAt);
-  const amount = isPromoActive ? plan.promoAmount : plan.amount;
-  const subscription = createPendingSubscription({
-    userId: req.userId,
-    planId,
-    amount,
-    currency: plan.currency,
-    gateway: process.env.PAYMENT_GATEWAY || 'pending_integration',
-  });
+  try {
+    const user = getUserById(req.userId);
+    const isRecurring = plan.type !== 'unico';
+    const paymentLink = await asaasRequest('/paymentLinks', {
+      method: 'POST',
+      body: JSON.stringify({
+        name: plan.name,
+        description: `Plano ${plan.name} - Chequetto`,
+        value: plan.amount,
+        billingType: 'UNDEFINED',
+        chargeType: isRecurring ? 'RECURRENT' : 'DETACHED',
+        ...(isRecurring ? { subscriptionCycle: asaasSubscriptionCycle(plan) } : {}),
+        dueDateLimitDays: 3,
+        externalReference: `${user.id}:${planId}`,
+      }),
+    });
+    const subscription = createPendingSubscription({
+      userId: req.userId,
+      planId,
+      amount: plan.amount,
+      currency: plan.currency,
+      gateway: 'asaas',
+      gatewayCheckoutId: paymentLink.id,
+    });
 
-  const checkoutUrl = plan.checkoutEnv && process.env[plan.checkoutEnv];
-  if (!checkoutUrl) {
-    return res.status(503).json({ error: `Checkout Hotmart do plano ${plan.name} ainda não foi configurado.` });
+    res.status(202).json({
+      status: subscription.status,
+      subscriptionId: subscription.id,
+      checkoutUrl: paymentLink.url,
+    });
+  } catch (error) {
+    console.error('Erro ao criar checkout Asaas:', error.message);
+    res.status(502).json({ error: error.message || 'Não foi possível iniciar o pagamento.' });
   }
-
-  res.status(202).json({
-    status: subscription.status,
-    subscriptionId: subscription.id,
-    checkoutUrl,
-  });
 });
 
-app.post('/api/billing/hotmart/webhook', (req, res) => {
-  const expectedToken = process.env.HOTMART_WEBHOOK_TOKEN;
-  if (expectedToken && req.headers['x-hotmart-hottok'] !== expectedToken) {
+app.post('/api/billing/asaas/webhook', (req, res) => {
+  const expectedToken = process.env.ASAAS_WEBHOOK_TOKEN;
+  if (expectedToken && req.headers['asaas-access-token'] !== expectedToken) {
     return res.status(401).json({ error: 'Webhook não autorizado.' });
+  }
+
+  const paymentEvents = new Set(['PAYMENT_CONFIRMED', 'PAYMENT_RECEIVED']);
+  const payment = req.body?.payment;
+  if (paymentEvents.has(req.body?.event) && payment?.externalReference) {
+    const [userId] = payment.externalReference.split(':');
+    if (userId) setUnlimited(userId, true);
   }
 
   res.status(202).json({ received: true });

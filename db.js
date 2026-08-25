@@ -189,12 +189,12 @@ function listProjectsByUser(userId) {
     }));
 }
 
-function createPendingSubscription({ userId, planId, amount, currency, gateway }) {
+function createPendingSubscription({ userId, planId, amount, currency, gateway, gatewayCheckoutId }) {
   const id = newId();
   db.prepare(
-    `INSERT INTO subscriptions (id, user_id, plan_id, amount, currency, gateway)
-     VALUES (?, ?, ?, ?, ?, ?)`
-  ).run(id, userId, planId, amount, currency, gateway || null);
+     `INSERT INTO subscriptions (id, user_id, plan_id, amount, currency, gateway, gateway_checkout_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?)`
+    ).run(id, userId, planId, amount, currency, gateway || null, gatewayCheckoutId || null);
   return db.prepare('SELECT * FROM subscriptions WHERE id = ?').get(id);
 }
 
