@@ -41,10 +41,36 @@ document.addEventListener('DOMContentLoaded', () => {
     historico: [],
     attachedFiles: []
   };
+  let activeUserId = null;
+
+  function storageKey(baseKey) {
+    return `${baseKey}:${activeUserId}`;
+  }
+
+  function clearWorkspace() {
+    state = { codigoAtual: '', promptAtual: '', promptDraft: '', planoAtual: [], historico: [], attachedFiles: [] };
+    if (el.prompt) el.prompt.value = '';
+    if (el.codeViewText) el.codeViewText.textContent = '';
+    if (el.previewFrame) {
+      el.previewFrame.hidden = true;
+      el.previewFrame.src = 'about:blank';
+    }
+    if (el.emptyState) el.emptyState.hidden = false;
+    if (el.planoList) {
+      el.planoList.innerHTML = '';
+      el.planoList.hidden = true;
+    }
+    if (el.historyList) el.historyList.innerHTML = '';
+    if (el.btnCopiar) el.btnCopiar.disabled = true;
+    if (el.btnBaixar) el.btnBaixar.disabled = true;
+    if (el.btnSalvar) el.btnSalvar.disabled = true;
+    renderAttachedFiles();
+  }
 
   function persistWorkspace() {
     try {
-      localStorage.setItem(WORKSPACE_STORAGE_KEY, JSON.stringify({
+      if (!activeUserId) return;
+      localStorage.setItem(storageKey(WORKSPACE_STORAGE_KEY), JSON.stringify({
         codigoAtual: state.codigoAtual,
         promptAtual: state.promptAtual,
         promptDraft: el.prompt?.value || state.promptDraft,
@@ -58,10 +84,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function persistSavedProject(project) {
     try {
-      const saved = JSON.parse(localStorage.getItem(SAVED_PROJECTS_STORAGE_KEY) || '[]');
+      if (!activeUserId) return;
+      const saved = JSON.parse(localStorage.getItem(storageKey(SAVED_PROJECTS_STORAGE_KEY)) || '[]');
       const next = saved.filter((item) => item.id !== project.id);
       next.unshift(project);
-      localStorage.setItem(SAVED_PROJECTS_STORAGE_KEY, JSON.stringify(next.slice(0, 30)));
+      localStorage.setItem(storageKey(SAVED_PROJECTS_STORAGE_KEY), JSON.stringify(next.slice(0, 30)));
     } catch (error) {
       console.warn('Não foi possível guardar o projeto localmente.', error);
     }
@@ -69,7 +96,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function restoreWorkspace() {
     try {
-      const saved = JSON.parse(localStorage.getItem(WORKSPACE_STORAGE_KEY) || 'null');
+      if (!activeUserId) return;
+      const saved = JSON.parse(localStorage.getItem(storageKey(WORKSPACE_STORAGE_KEY)) || 'null');
       if (!saved) return;
       state = {
         ...state,
@@ -195,10 +223,18 @@ document.addEventListener('DOMContentLoaded', () => {
   let loginPromptGuard = false;
   let authRequestedForPrompt = false;
 
-  window.addEventListener('chequetto:authenticated', () => {
+  window.addEventListener('chequetto:authenticated', (event) => {
+    activeUserId = event.detail?.user?.id || null;
+    clearWorkspace();
+    restoreWorkspace();
     authRequestedForPrompt = false;
     loginPromptGuard = false;
     el.prompt?.focus();
+  });
+
+  window.addEventListener('chequetto:logged-out', () => {
+    activeUserId = null;
+    clearWorkspace();
   });
 
   function requireLoadedAuth() {
@@ -513,6 +549,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
       projetos.forEach((projeto) => {
         state.historico.push({
+          id: projeto.id,
           prompt: projeto.nome || projeto.prompt,
           code: projeto.html,
           plano: Array.isArray(projeto.plano) ? projeto.plano : [],
@@ -566,8 +603,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (event.key === 'Enter') el.btnRefinar?.click();
   });
 
-  restoreWorkspace();
-
   if (el.btnCopiar) {
     el.btnCopiar.addEventListener('click', async () => {
       if (!state.codigoAtual) return;
@@ -602,14 +637,19 @@ document.addEventListener('DOMContentLoaded', () => {
           body: JSON.stringify({ prompt: state.promptAtual, plano: state.planoAtual, html: state.codigoAtual }),
         });
         const data = await res.json();
+        if (res.status === 401) throw new Error('Não autenticado');
         if (!res.ok) throw new Error(data.error || 'Falha ao salvar');
-        persistSavedProject({
-          id: data.project?.id || `local-${Date.now()}`,
+        const savedProject = {
+          id: data.project?.id,
           prompt: state.promptAtual,
           nome: data.project?.nome || state.promptAtual.slice(0, 60),
           html: state.codigoAtual,
           plano: state.planoAtual,
-        });
+        };
+        persistSavedProject(savedProject);
+        state.historico = state.historico.filter((item) => item.id !== savedProject.id);
+        state.historico.unshift({ id: savedProject.id, prompt: savedProject.nome, code: savedProject.html, plano: savedProject.plano });
+        renderHistory();
         persistWorkspace();
         el.btnSalvar.textContent = 'Salvo ✓';
         setTimeout(() => { el.btnSalvar.textContent = original; el.btnSalvar.disabled = false; }, 1800);

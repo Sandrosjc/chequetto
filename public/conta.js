@@ -107,9 +107,13 @@ document.addEventListener('DOMContentLoaded', () => {
         window.open(`https://wa.me/?text=${text}`, '_blank', 'noopener,noreferrer');
       });
       document.getElementById('btnLogout')?.addEventListener('click', async () => {
-        await fetch('/api/auth/logout', { method: 'POST' });
-        currentUser = null;
-        renderAccountArea();
+        try {
+          await fetch('/api/auth/logout', { method: 'POST' });
+        } finally {
+          currentUser = null;
+          window.dispatchEvent(new CustomEvent('chequetto:logged-out'));
+          renderAccountArea();
+        }
       });
     } else {
       el.accountArea.innerHTML = `
@@ -197,7 +201,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (requestVersion !== authRequestVersion) return;
       currentUser = data.user;
       renderAccountArea();
-      window.dispatchEvent(new CustomEvent('chequetto:authenticated'));
+      window.dispatchEvent(new CustomEvent('chequetto:authenticated', { detail: { user: currentUser } }));
     } catch {
       if (requestVersion !== authRequestVersion) return;
       currentUser = null;
@@ -241,20 +245,20 @@ document.addEventListener('DOMContentLoaded', () => {
       el.planNote.textContent = freeText;
 
       if (planId === 'gratis') {
-        pendingAction = () => openCheckout(planName);
+        pendingAction = () => openCheckout(planId);
         openModal();
         switchTab('signup');
         return;
       }
 
       if (!currentUser) {
-        pendingAction = () => openCheckout(planName);
+        pendingAction = () => openCheckout(planId);
         openModal();
         switchTab('signup');
         return;
       }
 
-      openCheckout(planName);
+      openCheckout(planId);
     });
   });
 
