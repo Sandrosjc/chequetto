@@ -131,22 +131,22 @@
     <div class="auth-layout">
       <section class="auth-panel">
         <p class="auth-kicker">CHEQUETTO / ACESSO</p>
-        <h2>Entre para construir.</h2>
-        <p class="auth-lead">Seu trabalho fica salvo e você pode continuar de onde parou.</p>
+        <h2 id="authTitle">Entre para construir.</h2>
+        <p class="auth-lead" id="authLead">Seu trabalho fica salvo e você pode continuar de onde parou.</p>
         <div class="auth-tabs">
           <button class="auth-tab is-active" id="authTabLogin" type="button">Entrar</button>
           <button class="auth-tab" id="authTabSignup" type="button">Criar conta</button>
         </div>
         <form id="formLogin" method="post" action="/api/auth/login">
-          <div class="auth-field"><input type="email" id="loginEmail" name="email" autocomplete="username" placeholder="Email" required></div>
+          <div class="auth-field"><label for="loginEmail">E-mail</label><input type="email" id="loginEmail" name="email" autocomplete="username" placeholder="Digite seu e-mail" required></div>
           <div class="auth-field"><label for="loginPassword">Senha</label><input type="password" id="loginPassword" name="password" autocomplete="current-password" placeholder="Digite sua senha" required></div>
           <p class="auth-error" id="loginError"></p>
           <button class="btn-primary auth-submit" type="submit">Entrar</button>
         </form>
         <form id="formSignup" method="post" action="/api/auth/signup" hidden>
-          <div class="auth-field"><input type="text" id="signupName" placeholder="Seu nome"></div>
-          <div class="auth-field"><input type="email" id="signupEmail" name="email" autocomplete="email" placeholder="Email" required></div>
-          <div class="auth-field"><input type="password" id="signupPassword" name="new-password" autocomplete="new-password" placeholder="Crie uma senha" required></div>
+          <div class="auth-field"><label for="signupName">Nome</label><input type="text" id="signupName" placeholder="Digite seu nome"></div>
+          <div class="auth-field"><label for="signupEmail">E-mail</label><input type="email" id="signupEmail" name="email" autocomplete="email" placeholder="Digite seu e-mail" required></div>
+          <div class="auth-field"><label for="signupPassword">Senha</label><input type="password" id="signupPassword" name="new-password" autocomplete="new-password" placeholder="Crie uma senha com pelo menos 6 caracteres" required></div>
           <input type="hidden" id="signupReferralCode" name="referralCode">
           <p class="auth-error" id="signupError"></p>
           <button class="btn-primary auth-submit" type="submit">Criar conta grátis</button>

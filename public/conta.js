@@ -5,6 +5,8 @@ document.addEventListener('DOMContentLoaded', () => {
     accountArea: document.getElementById('accountArea'),
     modalOverlay: document.getElementById('authModalOverlay'),
     modal: document.getElementById('authModal'),
+    authTitle: document.getElementById('authTitle'),
+    authLead: document.getElementById('authLead'),
     tabLogin: document.getElementById('authTabLogin'),
     tabSignup: document.getElementById('authTabSignup'),
     formLogin: document.getElementById('formLogin'),
@@ -150,6 +152,10 @@ document.addEventListener('DOMContentLoaded', () => {
     if (el.tabSignup) el.tabSignup.classList.toggle('is-active', !isLogin);
     if (el.formLogin) el.formLogin.hidden = !isLogin;
     if (el.formSignup) el.formSignup.hidden = isLogin;
+    if (el.authTitle) el.authTitle.textContent = isLogin ? 'Entre para construir.' : 'Crie sua conta.';
+    if (el.authLead) el.authLead.textContent = isLogin
+      ? 'Seu trabalho fica salvo e você pode continuar de onde parou.'
+      : 'Comece agora com seu e-mail e uma senha segura.';
   }
 
   function requireAuth(nextAction) {
