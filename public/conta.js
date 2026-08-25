@@ -282,7 +282,9 @@ document.addEventListener('DOMContentLoaded', () => {
   el.formLogin?.addEventListener('submit', async (e) => {
     e.preventDefault();
     el.loginError.textContent = '';
+    console.log('[AUTH][LOGIN] captura', { email: el.loginEmail?.value?.trim().toLowerCase(), senhaPreenchida: Boolean(el.loginPassword?.value), tamanhoSenha: el.loginPassword?.value?.length || 0 });
     try {
+      console.log('[AUTH][LOGIN] chamada API', { endpoint: '/api/auth/login', credentials: 'same-origin' });
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -290,12 +292,15 @@ document.addEventListener('DOMContentLoaded', () => {
         body: JSON.stringify({ email: el.loginEmail.value.trim().toLowerCase(), password: el.loginPassword.value }),
       });
       const data = await res.json().catch(() => ({}));
+      console.log('[AUTH][LOGIN] resposta API', { status: res.status, ok: res.ok, dados: data });
       if (!res.ok) throw new Error(data.error || 'Erro ao entrar');
       currentUser = data.user;
+      console.log('[AUTH][LOGIN] sessão recebida', { usuarioId: currentUser?.id, email: currentUser?.email, cookieVisivel: document.cookie.includes('oficina_token') });
       renderAccountArea();
       closeModal();
       continuePendingAction();
     } catch (err) {
+      console.error('[AUTH][LOGIN] erro', { name: err.name, message: err.message, stack: err.stack });
       el.loginError.textContent = err.message;
     }
   });

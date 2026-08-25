@@ -240,10 +240,13 @@ app.post('/api/auth/login', (req, res) => {
   const { email, password } = req.body || {};
   const htmlFallback = req.is('application/x-www-form-urlencoded');
   const finalEmail = (email || '').trim().toLowerCase();
+  console.log('[AUTH][LOGIN] requisição', { email: finalEmail, senhaPreenchida: Boolean(password), tamanhoSenha: typeof password === 'string' ? password.length : 0, formato: req.headers['content-type'] });
   if (!finalEmail || !password) return res.status(400).json({ error: 'Email e senha são obrigatórios' });
 
   const user = getUserByEmail(finalEmail);
+  console.log('[AUTH][LOGIN] usuário', { encontrado: Boolean(user), possuiHash: Boolean(user?.password_hash) });
   if (user && user.password_hash && comparePassword(password, user.password_hash)) {
+    console.log('[AUTH][LOGIN] senha válida; cookie sendo gravado', { usuarioId: user.id });
     const token = signUserToken(user);
     res.cookie('oficina_token', token, { httpOnly: true, sameSite: 'lax', maxAge: 30 * 24 * 3600 * 1000 });
     return htmlFallback ? res.redirect('/') : res.json({ user: publicUser(user) });
@@ -262,6 +265,7 @@ app.post('/api/auth/login', (req, res) => {
     return htmlFallback ? res.redirect('/') : res.json({ user: publicUser(demoUser) });
   }
 
+  console.warn('[AUTH][LOGIN] credenciais rejeitadas', { email: finalEmail, motivo: user ? 'senha-ou-hash-invalido' : 'usuario-nao-encontrado' });
   return htmlFallback ? res.redirect('/?auth_error=Email%20ou%20senha%20invalidos') : res.status(401).json({ error: 'Email ou senha inválidos' });
 });
 
