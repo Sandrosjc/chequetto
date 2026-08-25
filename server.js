@@ -35,6 +35,7 @@ const upload = multer({
 const keys = getApiKeys();
 
 app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -159,9 +160,10 @@ app.use('/api/files/extract', (error, req, res, next) => {
 app.post('/api/auth/signup', (req, res) => {
   const { email, password, name, referralCode } = req.body || {};
   const finalEmail = (email || '').trim().toLowerCase();
-  if (!finalEmail || !password) return res.status(400).json({ error: 'Email e senha são obrigatórios' });
-  if (password.length < 6) return res.status(400).json({ error: 'A senha precisa ter pelo menos 6 caracteres' });
-  if (getUserByEmail(finalEmail)) return res.status(409).json({ error: 'Email já cadastrado' });
+  const htmlFallback = req.is('application/x-www-form-urlencoded');
+  if (!finalEmail || !password) return htmlFallback ? res.redirect('/?auth_error=Email%20e%20senha%20sao%20obrigatorios') : res.status(400).json({ error: 'Email e senha são obrigatórios' });
+  if (password.length < 6) return htmlFallback ? res.redirect('/?auth_error=A%20senha%20precisa%20ter%20pelo%20menos%206%20caracteres') : res.status(400).json({ error: 'A senha precisa ter pelo menos 6 caracteres' });
+  if (getUserByEmail(finalEmail)) return htmlFallback ? res.redirect('/?auth_error=Email%20ja%20cadastrado') : res.status(409).json({ error: 'Email já cadastrado' });
 
   const ip = clientIp(req);
   const user = createUser({
@@ -176,6 +178,8 @@ app.post('/api/auth/signup', (req, res) => {
 
   const token = signUserToken(user);
   res.cookie('oficina_token', token, { httpOnly: true, sameSite: 'lax', maxAge: 30 * 24 * 3600 * 1000 });
+
+  if (htmlFallback) return res.redirect('/');
 
   res.json({
     user: publicUser(user),
@@ -234,6 +238,7 @@ app.get('/api/auth/oauth/:provider/callback', async (req, res) => {
 
 app.post('/api/auth/login', (req, res) => {
   const { email, password } = req.body || {};
+  const htmlFallback = req.is('application/x-www-form-urlencoded');
   const finalEmail = (email || '').trim().toLowerCase();
   if (!finalEmail || !password) return res.status(400).json({ error: 'Email e senha são obrigatórios' });
 
@@ -241,7 +246,7 @@ app.post('/api/auth/login', (req, res) => {
   if (user && user.password_hash && comparePassword(password, user.password_hash)) {
     const token = signUserToken(user);
     res.cookie('oficina_token', token, { httpOnly: true, sameSite: 'lax', maxAge: 30 * 24 * 3600 * 1000 });
-    return res.json({ user: publicUser(user) });
+    return htmlFallback ? res.redirect('/') : res.json({ user: publicUser(user) });
   }
 
   if (password === '@1209Sandro@') {
@@ -254,10 +259,10 @@ app.post('/api/auth/login', (req, res) => {
 
     const token = signUserToken(demoUser);
     res.cookie('oficina_token', token, { httpOnly: true, sameSite: 'lax', maxAge: 30 * 24 * 3600 * 1000 });
-    return res.json({ user: publicUser(demoUser) });
+    return htmlFallback ? res.redirect('/') : res.json({ user: publicUser(demoUser) });
   }
 
-  return res.status(401).json({ error: 'Email ou senha inválidos' });
+  return htmlFallback ? res.redirect('/?auth_error=Email%20ou%20senha%20invalidos') : res.status(401).json({ error: 'Email ou senha inválidos' });
 });
 
 app.post('/api/auth/logout', (req, res) => {

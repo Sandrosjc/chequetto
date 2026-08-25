@@ -143,16 +143,17 @@
           <button class="auth-tab is-active" id="authTabLogin" type="button">Entrar</button>
           <button class="auth-tab" id="authTabSignup" type="button">Criar conta</button>
         </div>
-        <form id="formLogin">
+        <form id="formLogin" method="post" action="/api/auth/login">
           <div class="auth-field"><input type="email" id="loginEmail" name="email" autocomplete="username" placeholder="Email" required></div>
           <div class="auth-field"><input type="password" id="loginPassword" name="password" autocomplete="current-password" placeholder="Senha" required></div>
           <p class="auth-error" id="loginError"></p>
           <button class="btn-primary auth-submit" type="submit">Entrar</button>
         </form>
-        <form id="formSignup" hidden>
+        <form id="formSignup" method="post" action="/api/auth/signup" hidden>
           <div class="auth-field"><input type="text" id="signupName" placeholder="Seu nome"></div>
           <div class="auth-field"><input type="email" id="signupEmail" name="email" autocomplete="email" placeholder="Email" required></div>
           <div class="auth-field"><input type="password" id="signupPassword" name="new-password" autocomplete="new-password" placeholder="Crie uma senha" required></div>
+          <input type="hidden" id="signupReferralCode" name="referralCode">
           <p class="auth-error" id="signupError"></p>
           <button class="btn-primary auth-submit" type="submit">Criar conta grátis</button>
         </form>

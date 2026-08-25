@@ -169,8 +169,10 @@ document.addEventListener('DOMContentLoaded', () => {
   async function fetchMe() {
     try {
       const oauthError = new URLSearchParams(window.location.search).get('oauth_error');
-      if (oauthError) {
-        if (el.socialLoginNote) el.socialLoginNote.textContent = oauthError;
+      const authError = new URLSearchParams(window.location.search).get('auth_error');
+      if (oauthError || authError) {
+        if (el.socialLoginNote) el.socialLoginNote.textContent = oauthError || '';
+        if (el.loginError) el.loginError.textContent = authError || '';
         openModal();
         window.history.replaceState({}, document.title, window.location.pathname);
       }
@@ -304,6 +306,8 @@ document.addEventListener('DOMContentLoaded', () => {
     try {
       const params = new URLSearchParams(window.location.search);
       const referralCode = params.get('convite') || undefined;
+      const referralField = document.getElementById('signupReferralCode');
+      if (referralField) referralField.value = referralCode || '';
 
       const res = await fetch('/api/auth/signup', {
         method: 'POST',
