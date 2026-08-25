@@ -193,6 +193,13 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   let loginPromptGuard = false;
+  let authRequestedForPrompt = false;
+
+  window.addEventListener('chequetto:authenticated', () => {
+    authRequestedForPrompt = false;
+    loginPromptGuard = false;
+    el.prompt?.focus();
+  });
 
   function requireLoadedAuth() {
     const auth = window.chequettoAuth;
@@ -207,6 +214,8 @@ document.addEventListener('DOMContentLoaded', () => {
       return;
     }
     if (!window.chequettoAuth?.isAuthenticated() && !loginPromptGuard) {
+      if (authRequestedForPrompt) return;
+      authRequestedForPrompt = true;
       loginPromptGuard = true;
       window.chequettoAuth?.openLogin();
       el.prompt?.blur();
@@ -374,11 +383,13 @@ document.addEventListener('DOMContentLoaded', () => {
   if (el.btnGerar) {
     el.btnGerar.addEventListener('click', async () => {
       if (!(await requireLoadedAuth())) {
+        authRequestedForPrompt = true;
         window.chequettoAuth?.openLogin();
         if (el.status) el.status.textContent = 'Entre ou crie sua conta para gerar o aplicativo.';
         return;
       }
       if (!window.chequettoAuth?.isAuthenticated()) {
+        authRequestedForPrompt = true;
         window.chequettoAuth?.openLogin();
         if (el.status) el.status.textContent = 'Entre ou crie sua conta para gerar o aplicativo.';
         return;

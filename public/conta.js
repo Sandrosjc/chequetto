@@ -342,6 +342,8 @@ document.addEventListener('DOMContentLoaded', () => {
       currentUser = data.user;
       renderAccountArea();
       closeModal();
+      window.dispatchEvent(new CustomEvent('chequetto:authenticated'));
+      window.dispatchEvent(new CustomEvent('chequetto:authenticated'));
       continuePendingAction();
     } catch (err) {
       el.signupError.textContent = err.message;
