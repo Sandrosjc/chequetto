@@ -40,18 +40,18 @@
 
   const languageNames = { pt: 'Português', en: 'English', es: 'Español', fr: 'Français', de: 'Deutsch', it: 'Italiano', ja: '日本語', zh: '中文', ko: '한국어', ru: 'Русский', ar: 'العربية', hi: 'हिन्दी' };
   const offerTranslations = {
-    pt: ['OFERTA ESPECIAL', 'Acesso vitalício por R$ 799,90', 'Condição promocional disponível por mais', 'Garantir acesso vitalício'],
-    en: ['SPECIAL OFFER', 'Lifetime access for R$ 799.90', 'Promotional offer available for', 'Get lifetime access'],
-    es: ['OFERTA ESPECIAL', 'Acceso vitalicio por R$ 799,90', 'Oferta promocional disponible durante', 'Garantizar acceso vitalicio'],
-    fr: ['OFFRE SPÉCIALE', 'Accès à vie pour R$ 799,90', 'Offre promotionnelle disponible pendant', 'Garantir l’accès à vie'],
-    de: ['SONDERANGEBOT', 'Lebenslanger Zugang für R$ 799,90', 'Dieses Angebot gilt noch', 'Lebenslangen Zugang sichern'],
-    it: ['OFFERTA SPECIALE', 'Accesso a vita per R$ 799,90', 'Offerta promozionale disponibile per', 'Garantisci accesso a vita'],
-    ja: ['特別オファー', '永久アクセス R$ 799,90', 'プロモーション期間の残り', '永久アクセスを確保'],
-    zh: ['特别优惠', '永久访问 R$ 799,90', '促销优惠剩余', '获取永久访问'],
-    ko: ['특별 혜택', '평생 이용권 R$ 799,90', '프로모션 혜택 남은 시간', '평생 이용권 받기'],
-    ru: ['СПЕЦИАЛЬНОЕ ПРЕДЛОЖЕНИЕ', 'Пожизненный доступ за R$ 799,90', 'До конца предложения', 'Получить пожизненный доступ'],
-    ar: ['عرض خاص', 'وصول مدى الحياة مقابل R$ 799,90', 'العرض الترويجي متاح لمدة', 'احصل على الوصول مدى الحياة'],
-    hi: ['विशेष ऑफ़र', 'R$ 799,90 में आजीवन पहुँच', 'प्रचार ऑफ़र उपलब्ध है', 'आजीवन पहुँच पाएं']
+    pt: ['OFERTA ESPECIAL', 'Acesso vitalício por R$ 390,00', 'Condição promocional disponível por mais', 'Garantir acesso vitalício'],
+    en: ['SPECIAL OFFER', 'Lifetime access for R$ 390.00', 'Promotional offer available for', 'Get lifetime access'],
+    es: ['OFERTA ESPECIAL', 'Acceso vitalicio por R$ 390,00', 'Oferta promocional disponible durante', 'Garantizar acceso vitalicio'],
+    fr: ['OFFRE SPÉCIALE', 'Accès à vie pour R$ 390,00', 'Offre promotionnelle disponible pendant', 'Garantir l’accès à vie'],
+    de: ['SONDERANGEBOT', 'Lebenslanger Zugang für R$ 390,00', 'Dieses Angebot gilt noch', 'Lebenslangen Zugang sichern'],
+    it: ['OFFERTA SPECIALE', 'Accesso a vita per R$ 390,00', 'Offerta promozionale disponibile per', 'Garantisci accesso a vita'],
+    ja: ['特別オファー', '永久アクセス R$ 390,00', 'プロモーション期間の残り', '永久アクセスを確保'],
+    zh: ['特别优惠', '永久访问 R$ 390,00', '促销优惠剩余', '获取永久访问'],
+    ko: ['특별 혜택', '평생 이용권 R$ 390,00', '프로모션 혜택 남은 시간', '평생 이용권 받기'],
+    ru: ['СПЕЦИАЛЬНОЕ ПРЕДЛОЖЕНИЕ', 'Пожизненный доступ за R$ 390,00', 'До конца предложения', 'Получить пожизненный доступ'],
+    ar: ['عرض خاص', 'وصول مدى الحياة مقابل R$ 390,00', 'العرض الترويجي متاح لمدة', 'احصل على الوصول مدى الحياة'],
+    hi: ['विशेष ऑफ़र', 'R$ 390,00 में आजीवन पहुँच', 'प्रचार ऑफ़र उपलब्ध है', 'आजीवन पहुँच पाएं']
   };
   const browserLanguage = (navigator.language || 'en').slice(0, 2);
   let currentLanguage = localStorage.getItem('chequetto_language') || (translations[browserLanguage] ? browserLanguage : 'en');

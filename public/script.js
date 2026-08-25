@@ -144,6 +144,47 @@ document.addEventListener('DOMContentLoaded', () => {
   const rotatingKeywords = ['ideias em aplicativos', 'processos em automações', 'problemas em soluções', 'planos em produtos reais', 'descrições em interfaces prontas'];
   let rotatingKeywordIndex = 0;
   const rotatingKeyword = document.getElementById('rotatingKeyword');
+  const buildPromise = document.getElementById('buildPromise');
+  const carouselTitle = document.getElementById('carouselTitle');
+  const carouselDescription = document.getElementById('carouselDescription');
+  const carouselBenefit = document.getElementById('carouselBenefit');
+  const carouselDots = document.getElementById('carouselDots');
+  const carouselCta = document.getElementById('carouselCta');
+  const carouselSlides = [
+    {
+      title: 'Transforme uma ideia em um app funcional',
+      description: 'Descreva seu objetivo e a IA monta telas, componentes e interações para você testar agora.',
+      benefit: 'Comece grátis com 20 créditos e refine o resultado conversando.',
+    },
+    {
+      title: 'Crie com clareza, mesmo sem programar',
+      description: 'Explique público, telas, regras e estilo. Quanto mais contexto você enviar, mais preciso será o primeiro resultado.',
+      benefit: 'Anexe PDFs, planilhas ou código para a IA entender seu projeto.',
+    },
+    {
+      title: 'Teste, ajuste e salve sua evolução',
+      description: 'Veja a prévia em desktop, tablet ou celular e peça alterações sem começar tudo de novo.',
+      benefit: 'Seu histórico fica disponível para retomar ideias e comparar versões.',
+    },
+  ];
+  let carouselIndex = 0;
+  function renderCarousel() {
+    const slide = carouselSlides[carouselIndex];
+    if (carouselTitle) carouselTitle.textContent = slide.title;
+    if (carouselDescription) carouselDescription.textContent = slide.description;
+    if (carouselBenefit) carouselBenefit.textContent = slide.benefit;
+    if (carouselDots) {
+      carouselDots.innerHTML = carouselSlides.map((_, index) => `<span class="carousel-dot${index === carouselIndex ? ' is-active' : ''}"></span>`).join('');
+    }
+  }
+  renderCarousel();
+  if (carouselTitle) {
+    setInterval(() => {
+      carouselIndex = (carouselIndex + 1) % carouselSlides.length;
+      renderCarousel();
+    }, 4200);
+  }
+  carouselCta?.addEventListener('click', () => window.chequettoAuth?.openLogin());
   if (rotatingKeyword) {
     setInterval(() => {
       rotatingKeywordIndex = (rotatingKeywordIndex + 1) % rotatingKeywords.length;
@@ -400,6 +441,12 @@ document.addEventListener('DOMContentLoaded', () => {
     if (el.spinner) el.spinner.hidden = !loading;
     if (el.btnGerarLabel) el.btnGerarLabel.textContent = loading ? 'Gerando...' : 'Gerar aplicativo';
     if (loading && el.status) el.status.textContent = 'A Inteligência Artificial está montando o app...';
+    if (buildPromise) {
+      buildPromise.textContent = loading
+        ? 'Enquanto você espera, estamos transformando sua ideia em uma experiência que pode ser testada e ajustada agora.'
+        : 'Sua ideia vira um aplicativo funcional, pronto para testar e refinar.';
+      buildPromise.classList.toggle('is-loading', loading);
+    }
     if (!loading && el.stageBar) {
       setTimeout(() => { el.stageBar.hidden = true; }, 1200);
     }
@@ -550,7 +597,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const btnShareWhatsapp = document.getElementById('btnShareWhatsapp');
   btnShareWhatsapp?.addEventListener('click', () => {
-    const text = encodeURIComponent('Olha esse app que eu gerei no Chequetto: https://chequetto.app');
+    const link = window.chequettoAuth?.getReferralLink?.() || window.location.origin;
+    const text = encodeURIComponent(`Crie seu aplicativo grátis no Chequetto: ${link}`);
     const url = `https://wa.me/?text=${text}`;
     window.open(url, '_blank', 'noopener,noreferrer');
   });

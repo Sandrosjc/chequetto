@@ -32,7 +32,7 @@ document.addEventListener('DOMContentLoaded', () => {
     Mensal: { value: 'R$ 29,90', frequency: 'por mês' },
     Trimestral: { value: 'R$ 79,90', frequency: 'por trimestre' },
     Anual: { value: 'R$ 299,90', frequency: 'por ano' },
-    Vitalício: { value: 'R$ 799,90', frequency: 'pagamento único' },
+    Vitalício: { value: 'R$ 390,00', frequency: 'pagamento único' },
   };
 
   let currentUser = null;
@@ -42,12 +42,10 @@ document.addEventListener('DOMContentLoaded', () => {
   function startOfferCountdown() {
     const countdown = document.getElementById('offerCountdown');
     if (!countdown) return;
-    const key = 'chequetto_lifetime_offer_ends_v1';
-    let endsAt = Number(localStorage.getItem(key));
-    if (!endsAt || endsAt <= Date.now()) {
-      endsAt = Date.now() + 7 * 24 * 60 * 60 * 1000;
-      localStorage.setItem(key, String(endsAt));
-    }
+    const endsAt = Date.parse('2026-09-01T00:00:00.000Z');
+    const offerTitle = document.getElementById('offerTitle');
+    const offerRemaining = document.getElementById('offerRemaining');
+    const offerButton = document.getElementById('offerButton');
     const update = () => {
       const remaining = Math.max(0, endsAt - Date.now());
       const days = Math.floor(remaining / 86400000);
@@ -55,13 +53,21 @@ document.addEventListener('DOMContentLoaded', () => {
       const minutes = Math.floor((remaining % 3600000) / 60000);
       const seconds = Math.floor((remaining % 60000) / 1000);
       countdown.textContent = `${days}d ${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+      if (!remaining) {
+        if (offerTitle) offerTitle.textContent = 'Acesso vitalício por R$ 980,00';
+        if (offerRemaining) offerRemaining.textContent = 'Preço regular';
+        if (offerButton) offerButton.textContent = 'Garantir acesso vitalício';
+      }
     };
     update();
     setInterval(update, 1000);
   }
 
   function renderCheckoutSummary() {
-    const details = planCatalog[selectedPlan] || planCatalog.Mensal;
+    const details = { ...(planCatalog[selectedPlan] || planCatalog.Mensal) };
+    if (selectedPlan === 'Vitalício' && Date.now() >= Date.parse('2026-09-01T00:00:00.000Z')) {
+      details.value = 'R$ 980,00';
+    }
     if (el.checkoutPlanName) el.checkoutPlanName.textContent = selectedPlan;
     if (el.checkoutPlanValue) el.checkoutPlanValue.textContent = details.value;
     if (el.checkoutPlanFrequency) el.checkoutPlanFrequency.textContent = details.frequency;
@@ -86,9 +92,15 @@ document.addEventListener('DOMContentLoaded', () => {
         <div class="account-chip">
           <span class="account-chip__credits" title="Créditos disponíveis">⚡ ${creditsLabel}</span>
           <span class="account-chip__email">${currentUser.email}</span>
+          <button class="btn-ghost btn-ghost--small" id="btnInvite" title="Compartilhar convite">+20</button>
           <button class="btn-ghost btn-ghost--small" id="btnLogout">Sair</button>
         </div>
       `;
+      document.getElementById('btnInvite')?.addEventListener('click', () => {
+        const link = `${window.location.origin}/?convite=${encodeURIComponent(currentUser.referralCode)}`;
+        const text = encodeURIComponent(`Crie seu aplicativo grátis no Chequetto e ganhe 20 créditos: ${link}`);
+        window.open(`https://wa.me/?text=${text}`, '_blank', 'noopener,noreferrer');
+      });
       document.getElementById('btnLogout')?.addEventListener('click', async () => {
         await fetch('/api/auth/logout', { method: 'POST' });
         currentUser = null;
@@ -151,10 +163,13 @@ document.addEventListener('DOMContentLoaded', () => {
     requireAuth,
     openCheckout,
     refresh: fetchMe,
+    getReferralLink: () => currentUser ? `${window.location.origin}/?convite=${encodeURIComponent(currentUser.referralCode)}` : window.location.origin,
   };
 
   async function fetchMe() {
     try {
+      const oauthError = new URLSearchParams(window.location.search).get('oauth_error');
+      if (oauthError && el.socialLoginNote) el.socialLoginNote.textContent = oauthError;
       const res = await fetch('/api/me');
       if (!res.ok) {
         currentUser = null;
@@ -190,7 +205,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.querySelectorAll('[data-provider]').forEach((button) => {
     button.addEventListener('click', () => {
-      el.socialLoginNote.textContent = `Login com ${button.dataset.provider} precisa ser conectado nas credenciais OAuth.`;
+      const provider = button.dataset.provider.toLowerCase();
+      el.socialLoginNote.textContent = `Abrindo login ${button.dataset.provider}...`;
+      window.location.assign(`/api/auth/oauth/${provider}`);
     });
   });
 

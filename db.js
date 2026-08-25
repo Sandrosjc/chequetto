@@ -68,11 +68,11 @@ function genReferralCode() {
 
 const CREDIT_RULES = {
   SIGNUP_FREE: 20,
-  SIGNUP_VIA_INVITE_BONUS: 6,
+  SIGNUP_VIA_INVITE_BONUS: 0,
   INVITE_TIERS: [
-    { tier: 1, invitesRequired: 1, bonus: 6 },
-    { tier: 2, invitesRequired: 2, bonus: 12 },
-    { tier: 3, invitesRequired: 3, bonus: 18 },
+    { tier: 1, invitesRequired: 1, bonus: 20 },
+    { tier: 2, invitesRequired: 2, bonus: 20 },
+    { tier: 3, invitesRequired: 3, bonus: 20 },
   ],
 };
 
@@ -133,6 +133,11 @@ function deductCredit(userId) {
 function applyInviteBonusIfNeeded(invitedUserId) {
   const invite = db.prepare('SELECT * FROM invites WHERE invited_user_id = ? AND credited = 0').get(invitedUserId);
   if (!invite) return;
+
+  const users = db.prepare('SELECT id, signup_ip FROM users WHERE id IN (?, ?)').all(invite.inviter_id, invitedUserId);
+  const inviter = users.find((user) => user.id === invite.inviter_id);
+  const invited = users.find((user) => user.id === invitedUserId);
+  if (!inviter || !invited || !inviter.signup_ip || !invited.signup_ip || inviter.signup_ip === invited.signup_ip) return;
 
   const inviterCreditedCount = db
     .prepare('SELECT COUNT(*) as c FROM invites WHERE inviter_id = ? AND credited = 1')

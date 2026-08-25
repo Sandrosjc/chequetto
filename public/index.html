@@ -32,7 +32,7 @@
     <div>
       <label class="field__label" for="prompt" data-i18n="hero">O que vamos construir hoje?</label>
       <div class="prompt-wrap">
-        <textarea id="prompt" rows="6" data-i18n-placeholder="prompt" placeholder="Ex: crie uma lista de tarefas com prioridade e prazo..."></textarea>
+        <textarea id="prompt" rows="6" data-i18n-placeholder="prompt" placeholder="Descreva seu app com o máximo de detalhes: objetivo, público, telas, campos, regras, cores, textos, botões e integrações..."></textarea>
         <label class="btn-attach" for="fileAttach" title="Adicionar arquivos" aria-label="Adicionar arquivos">+<input id="fileAttach" type="file" multiple hidden></label>
         <button type="button" class="btn-mic" id="btnMic" title="Falar em vez de digitar" aria-label="Falar em vez de digitar">🎙</button>
       </div>
@@ -101,9 +101,16 @@
         <pre class="code-view" id="codeView" hidden><code id="codeViewText"></code></pre>
       </div>
       <div class="empty-state" id="emptyState">
-        <p><strong data-i18n="empty">Nenhum aplicativo gerado ainda</strong></p>
-        <p class="empty-state__sub" data-i18n="emptySub">Descreva o que você quer criar na bancada ao lado e clique em "Gerar aplicativo".</p>
-        <div class="keyword-loop" aria-live="polite"><span id="rotatingKeyword">ideias em aplicativos</span></div>
+        <div class="conversion-carousel" aria-live="polite">
+          <span class="carousel-kicker">CHEQUETTO AI STUDIO</span>
+          <p><strong id="carouselTitle">Transforme uma ideia em um app funcional</strong></p>
+          <p class="empty-state__sub" id="carouselDescription">Descreva seu objetivo e a IA monta telas, componentes e interações para você testar agora.</p>
+          <div class="carousel-benefit" id="carouselBenefit">Comece grátis com 20 créditos e refine o resultado conversando.</div>
+          <button class="carousel-cta" id="carouselCta" type="button">Começar grátis</button>
+          <div class="carousel-dots" id="carouselDots" aria-label="Benefícios do Chequetto"></div>
+        </div>
+        <div class="build-promise" id="buildPromise">Sua ideia vira um aplicativo funcional, pronto para testar e refinar.</div>
+        <div class="keyword-loop" aria-hidden="true"><span id="rotatingKeyword">ideias em aplicativos</span></div>
       </div>
     </div>
     <div class="stage__refine">
@@ -172,13 +179,13 @@
             <small>Melhor valor para projetos longos</small>
           </button>
           <button class="plan-card" type="button" data-plan="Vitalício">
-            <span class="plan-card__name">Vitalício</span><strong>R$ 799,90<span>/único</span></strong>
+            <span class="plan-card__name">Vitalício</span><strong>R$ 980,00<span>/único</span></strong>
             <small>Acesso completo sem mensalidade</small>
           </button>
         </div>
         <div class="lifetime-offer" id="lifetimeOffer">
           <span class="lifetime-offer__tag" id="offerTag">OFERTA ESPECIAL</span>
-          <strong id="offerTitle">Acesso vitalício por R$ 799,90</strong>
+          <strong id="offerTitle">Acesso vitalício por R$ 390,00</strong>
           <small><span id="offerRemaining">Condição promocional disponível por mais</span> <b id="offerCountdown">7d 00:00:00</b></small>
           <button class="btn-primary lifetime-offer__button" id="offerButton" type="button" data-plan="Vitalício">Garantir acesso vitalício</button>
         </div>
@@ -211,7 +218,7 @@
           <span>Anual</span><strong>R$ 299,90<span>/ano</span></strong>
         </button>
         <button class="checkout-plan" type="button" data-checkout-plan="Vitalício">
-          <span>Vitalício</span><strong>R$ 799,90<span>/único</span></strong>
+          <span>Vitalício</span><strong>R$ 980,00<span>/único</span></strong>
         </button>
       </section>
       <aside class="checkout-summary">

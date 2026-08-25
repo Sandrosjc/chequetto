@@ -330,7 +330,21 @@ body{
 .empty-state p{margin:2px 0;}
 .empty-state__sub{font-size:12.5px;max-width:320px;}
 .keyword-loop{margin-top:18px;color:var(--ember);font:600 12px var(--mono);min-height:18px;}
+.build-promise{max-width:420px;margin:18px 0 0;color:var(--ink);font-size:14px;font-weight:600;line-height:1.45;}
+.build-promise.is-loading{animation:pulse-promise 1.8s ease-in-out infinite;}
+@keyframes pulse-promise{0%,100%{opacity:.55}50%{opacity:1}}
 .keyword-loop span{display:inline-block;animation:keyword-in .35s ease both;}
+.conversion-carousel{width:min(560px,calc(100% - 40px));padding:34px 38px;text-align:left;background:rgba(255,255,255,.94);border:1px solid #dce8df;border-left:5px solid #2e9b72;box-shadow:0 18px 45px rgba(16,24,39,.12);pointer-events:auto;animation:carousel-in .5s ease both;}
+.carousel-kicker{color:#2e9b72;font:700 11px var(--mono);letter-spacing:.14em;}
+.conversion-carousel strong{display:block;margin-top:14px;color:#101827;font:700 clamp(24px,3vw,38px)/1.08 var(--display);letter-spacing:0;}
+.conversion-carousel .empty-state__sub{max-width:none;margin:16px 0 0;color:#526176;font-size:16px;line-height:1.55;}
+.carousel-benefit{margin-top:18px;color:#197253;font-size:14px;font-weight:700;line-height:1.45;}
+.carousel-cta{margin-top:22px;padding:12px 18px;border:0;border-radius:4px;background:#101827;color:#fff;font:700 14px var(--display);cursor:pointer;box-shadow:4px 4px 0 #c7f36b;}
+.carousel-cta:hover{background:#24344d;transform:translate(-1px,-1px);}
+.carousel-dots{display:flex;gap:7px;margin-top:25px;}
+.carousel-dot{width:24px;height:4px;background:#dce8df;}
+.carousel-dot.is-active{background:#2e9b72;}
+@keyframes carousel-in{from{opacity:.35;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
 @keyframes keyword-in{from{opacity:0;transform:translateY(5px)}to{opacity:1;transform:translateY(0)}}
 .lifetime-offer{display:flex;flex-direction:column;gap:5px;margin-top:4px;padding:12px;border:1px solid var(--ember);background:#fff7f3;color:var(--ink);border-radius:4px;}
 .lifetime-offer__tag{color:var(--ember);font:700 10px var(--mono);letter-spacing:.08em;}
@@ -450,6 +464,9 @@ body{
   .plans-panel{padding:24px;}
   .auth-panel{padding:28px 24px 24px;}
   .plans-panel h2{font-size:24px;}
+  .conversion-carousel{width:calc(100% - 24px);padding:26px 24px;}
+  .conversion-carousel strong{font-size:26px;}
+  .conversion-carousel .empty-state__sub{font-size:14px;}
 }
 
 /* Direcao visual 2026: estudio claro, tipografia forte e acentos vivos. */
