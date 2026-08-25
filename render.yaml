@@ -10,3 +10,15 @@ services:
         sync: false
       - key: JWT_SECRET
         generateValue: true
+      - key: PAYMENT_GATEWAY
+        value: hotmart
+      - key: HOTMART_CHECKOUT_MENSAL
+        sync: false
+      - key: HOTMART_CHECKOUT_TRIMESTRAL
+        sync: false
+      - key: HOTMART_CHECKOUT_ANUAL
+        sync: false
+      - key: HOTMART_CHECKOUT_VITALICIO
+        sync: false
+      - key: HOTMART_WEBHOOK_TOKEN
+        sync: false
