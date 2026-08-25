@@ -201,7 +201,7 @@ app.get('/api/me', requireAuth, (req, res) => {
 app.post('/api/billing/checkout', requireAuth, (req, res) => {
   const { planId } = req.body || {};
   const plan = plans[planId];
-  if (!plan || planId === 'Gratis') {
+  if (!plan || planId === 'gratis') {
     return res.status(400).json({ error: 'Plano pago inválido.' });
   }
 

@@ -29,11 +29,12 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   const planCatalog = {
-    Grátis: { value: 'R$ 0', frequency: 'sempre' },
-    Mensal: { value: 'R$ 29,90', frequency: 'por mês' },
-    Trimestral: { value: 'R$ 79,90', frequency: 'por trimestre' },
-    Anual: { value: 'R$ 299,90', frequency: 'por ano' },
-    Vitalício: { value: 'R$ 390,00', frequency: 'pagamento único' },
+    gratis: { name: 'Grátis', value: 'R$ 0', frequency: 'sempre' },
+    mensal: { name: 'Mensal', value: 'R$ 29,90', frequency: 'por mês' },
+    trimestral: { name: 'Trimestral', value: 'R$ 79,90', frequency: 'por trimestre' },
+    anual: { name: 'Anual', value: 'R$ 299,90', frequency: 'por ano' },
+    vitalicio_promo: { name: 'Acesso Vitalício (Oferta Especial)', value: 'R$ 390,00', frequency: 'pagamento único' },
+    vitalicio_regular: { name: 'Vitalício (Padrão)', value: 'R$ 980,00', frequency: 'pagamento único' },
   };
 
   let currentUser = null;
@@ -44,7 +45,7 @@ document.addEventListener('DOMContentLoaded', () => {
     resolveAuthReady = resolve;
   });
   let pendingAction = null;
-  let selectedPlan = 'Mensal';
+  let selectedPlan = 'mensal';
 
   function startOfferCountdown() {
     const countdown = document.getElementById('offerCountdown');
@@ -71,11 +72,8 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function renderCheckoutSummary() {
-    const details = { ...(planCatalog[selectedPlan] || planCatalog.Mensal) };
-    if (selectedPlan === 'Vitalício' && Date.now() >= Date.parse('2026-09-01T00:00:00.000Z')) {
-      details.value = 'R$ 980,00';
-    }
-    if (el.checkoutPlanName) el.checkoutPlanName.textContent = selectedPlan;
+    const details = { ...(planCatalog[selectedPlan] || planCatalog.mensal) };
+    if (el.checkoutPlanName) el.checkoutPlanName.textContent = details.name;
     if (el.checkoutPlanValue) el.checkoutPlanValue.textContent = details.value;
     if (el.checkoutPlanFrequency) el.checkoutPlanFrequency.textContent = details.frequency;
     document.querySelectorAll('[data-checkout-plan]').forEach((button) => {
@@ -137,7 +135,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function openCheckout(planName = selectedPlan) {
-    selectedPlan = planName || 'Mensal';
+    selectedPlan = planName || 'mensal';
     renderCheckoutSummary();
     if (el.checkoutModalOverlay) el.checkoutModalOverlay.hidden = false;
   }
@@ -234,14 +232,15 @@ document.addEventListener('DOMContentLoaded', () => {
     button.addEventListener('click', () => {
       document.querySelectorAll('[data-plan]').forEach((plan) => plan.classList.remove('is-selected'));
       button.classList.add('is-selected');
-      const planName = button.dataset.plan || 'Mensal';
-      selectedPlan = planName;
-      const freeText = planName === 'Grátis'
+      const planId = button.dataset.plan || 'mensal';
+      selectedPlan = planId;
+      const planName = planCatalog[planId]?.name || 'Mensal';
+      const freeText = planId === 'gratis'
         ? 'Plano Grátis: 20 créditos, ideal para testar e criar até 1 app completo.'
         : `Plano ${planName} selecionado. ${currentUser ? 'Continue para o pagamento.' : 'Crie sua conta para continuar.'}`;
       el.planNote.textContent = freeText;
 
-      if (planName === 'Grátis') {
+      if (planId === 'gratis') {
         pendingAction = () => openCheckout(planName);
         openModal();
         switchTab('signup');
@@ -261,7 +260,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   document.querySelectorAll('[data-checkout-plan]').forEach((button) => {
     button.addEventListener('click', () => {
-      selectedPlan = button.dataset.checkoutPlan || 'Mensal';
+      selectedPlan = button.dataset.checkoutPlan || 'mensal';
       renderCheckoutSummary();
     });
   });
