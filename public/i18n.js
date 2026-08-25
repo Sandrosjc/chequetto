@@ -76,6 +76,11 @@
     });
     const selector = document.getElementById('languageSelector');
     if (selector) selector.value = currentLanguage;
+    document.querySelectorAll('[data-language]').forEach((button) => {
+      const isActive = button.dataset.language === currentLanguage;
+      button.classList.toggle('is-active', isActive);
+      button.setAttribute('aria-pressed', String(isActive));
+    });
     window.dispatchEvent(new CustomEvent('chequetto:language-change', { detail: { language: currentLanguage } }));
   }
 
@@ -83,6 +88,9 @@
   document.addEventListener('DOMContentLoaded', () => {
     const selector = document.getElementById('languageSelector');
     selector?.addEventListener('change', () => applyLanguage(selector.value));
+    document.querySelectorAll('[data-language]').forEach((button) => {
+      button.addEventListener('click', () => applyLanguage(button.dataset.language));
+    });
     applyLanguage(currentLanguage);
   });
 }());
