@@ -285,8 +285,9 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Não foi possível iniciar o pagamento.');
+      if (!data.checkoutUrl) throw new Error('O Asaas não retornou o link de pagamento.');
       closeCheckout();
-      window.open(data.checkoutUrl, '_blank', 'noopener');
+      window.location.assign(data.checkoutUrl);
       if (el.planNote) el.planNote.textContent = 'Checkout Asaas aberto. Seu acesso será liberado após a confirmação do pagamento.';
     } catch (err) {
       if (el.planNote) el.planNote.textContent = err.message;

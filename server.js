@@ -74,7 +74,7 @@ async function asaasRequest(endpoint, options = {}) {
 }
 
 function asaasSubscriptionCycle(plan) {
-  return { month: 'MONTHLY', quarter: 'QUARTERLY', year: 'YEARLY' }[plan.interval];
+  return { month: 'MONTHLY', quarter: 'QUARTERLY', year: 'ANNUALLY' }[plan.interval];
 }
 
 // tenta pegar o usuário logado, sem exigir login (gerar app funciona sem conta também)
@@ -246,6 +246,7 @@ app.post('/api/billing/checkout', requireAuth, async (req, res) => {
         externalReference: `${user.id}:${planId}`,
       }),
     });
+    if (!paymentLink.url) throw new Error('O Asaas não retornou o link de pagamento.');
     const subscription = createPendingSubscription({
       userId: req.userId,
       planId,
