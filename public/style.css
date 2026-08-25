@@ -639,6 +639,7 @@ body{
   border-radius:0;
   padding:20px;
   position:relative;
+  pointer-events:auto;
 }
 .auth-modal__close{
   position:absolute;
@@ -683,6 +684,8 @@ body{
   padding:10px;
   font-size:13px;
   font-family:var(--sans);
+  pointer-events:auto;
+  user-select:text;
 }
 .auth-field input:focus{
   outline:none;

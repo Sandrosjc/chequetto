@@ -144,15 +144,15 @@
           <button class="auth-tab" id="authTabSignup" type="button">Criar conta</button>
         </div>
         <form id="formLogin">
-          <div class="auth-field"><input type="email" id="loginEmail" placeholder="Email" required></div>
-          <div class="auth-field"><input type="password" id="loginPassword" placeholder="Senha" required></div>
+          <div class="auth-field"><input type="email" id="loginEmail" name="email" autocomplete="username" placeholder="Email" required></div>
+          <div class="auth-field"><input type="password" id="loginPassword" name="password" autocomplete="current-password" placeholder="Senha" required></div>
           <p class="auth-error" id="loginError"></p>
           <button class="btn-primary auth-submit" type="submit">Entrar</button>
         </form>
         <form id="formSignup" hidden>
           <div class="auth-field"><input type="text" id="signupName" placeholder="Seu nome"></div>
-          <div class="auth-field"><input type="email" id="signupEmail" placeholder="Email" required></div>
-          <div class="auth-field"><input type="password" id="signupPassword" placeholder="Crie uma senha" required></div>
+          <div class="auth-field"><input type="email" id="signupEmail" name="email" autocomplete="email" placeholder="Email" required></div>
+          <div class="auth-field"><input type="password" id="signupPassword" name="new-password" autocomplete="new-password" placeholder="Crie uma senha" required></div>
           <p class="auth-error" id="signupError"></p>
           <button class="btn-primary auth-submit" type="submit">Criar conta grátis</button>
         </form>
@@ -241,8 +241,8 @@
   </div>
 </div>
 
-<script src="i18n.js"></script>
-<script src="script.js"></script>
-<script src="conta.js"></script>
+<script src="i18n.js?v=20260825-2"></script>
+<script src="script.js?v=20260825-2"></script>
+<script src="conta.js?v=20260825-2"></script>
 </body>
 </html>
