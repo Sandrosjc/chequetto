@@ -194,7 +194,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
   let loginPromptGuard = false;
 
+  function requireLoadedAuth() {
+    const auth = window.chequettoAuth;
+    if (!auth) return Promise.resolve(false);
+    if (!auth.isLoading?.()) return Promise.resolve(auth.isAuthenticated());
+    return auth.whenReady().then(() => auth.isAuthenticated());
+  }
+
   el.prompt?.addEventListener('focus', () => {
+    if (!loginPromptGuard && window.chequettoAuth?.isLoading?.()) {
+      el.prompt.blur();
+      return;
+    }
     if (!window.chequettoAuth?.isAuthenticated() && !loginPromptGuard) {
       loginPromptGuard = true;
       window.chequettoAuth?.openLogin();
@@ -229,6 +240,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   document.getElementById('aiTips')?.addEventListener('click', (event) => {
+    if (window.chequettoAuth?.isLoading?.()) return;
     if (!window.chequettoAuth?.isAuthenticated()) {
       window.chequettoAuth?.openLogin();
       return;
@@ -361,6 +373,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (el.btnGerar) {
     el.btnGerar.addEventListener('click', async () => {
+      if (!(await requireLoadedAuth())) {
+        window.chequettoAuth?.openLogin();
+        if (el.status) el.status.textContent = 'Entre ou crie sua conta para gerar o aplicativo.';
+        return;
+      }
       if (!window.chequettoAuth?.isAuthenticated()) {
         window.chequettoAuth?.openLogin();
         if (el.status) el.status.textContent = 'Entre ou crie sua conta para gerar o aplicativo.';

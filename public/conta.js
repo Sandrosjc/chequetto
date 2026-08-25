@@ -36,6 +36,11 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   let currentUser = null;
+  let authLoading = true;
+  let resolveAuthReady;
+  const authReady = new Promise((resolve) => {
+    resolveAuthReady = resolve;
+  });
   let pendingAction = null;
   let selectedPlan = 'Mensal';
 
@@ -159,6 +164,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   window.chequettoAuth = {
     isAuthenticated: () => !!currentUser,
+    isLoading: () => authLoading,
+    whenReady: () => authReady,
     openLogin: () => openModal(),
     requireAuth,
     openCheckout,
@@ -188,6 +195,11 @@ document.addEventListener('DOMContentLoaded', () => {
     } catch {
       currentUser = null;
       renderAccountArea();
+    } finally {
+      if (authLoading) {
+        authLoading = false;
+        resolveAuthReady();
+      }
     }
   }
 
