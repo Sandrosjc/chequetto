@@ -16,7 +16,6 @@ document.addEventListener('DOMContentLoaded', () => {
     signupEmail: document.getElementById('signupEmail'),
     signupPassword: document.getElementById('signupPassword'),
     signupError: document.getElementById('signupError'),
-    socialLoginNote: document.getElementById('socialLoginNote'),
     planNote: document.getElementById('planNote'),
     closeModal: document.getElementById('closeAuthModal'),
     checkoutModalOverlay: document.getElementById('checkoutModalOverlay'),
@@ -177,10 +176,8 @@ document.addEventListener('DOMContentLoaded', () => {
   async function fetchMe() {
     const requestVersion = authRequestVersion;
     try {
-      const oauthError = new URLSearchParams(window.location.search).get('oauth_error');
       const authError = new URLSearchParams(window.location.search).get('auth_error');
-      if (oauthError || authError) {
-        if (el.socialLoginNote) el.socialLoginNote.textContent = oauthError || '';
+      if (authError) {
         if (el.loginError) el.loginError.textContent = authError || '';
         openModal();
         window.history.replaceState({}, document.title, window.location.pathname);
@@ -196,6 +193,7 @@ document.addEventListener('DOMContentLoaded', () => {
       if (requestVersion !== authRequestVersion) return;
       currentUser = data.user;
       renderAccountArea();
+      window.dispatchEvent(new CustomEvent('chequetto:authenticated'));
     } catch {
       if (requestVersion !== authRequestVersion) return;
       currentUser = null;
@@ -224,14 +222,6 @@ document.addEventListener('DOMContentLoaded', () => {
   el.closeCheckoutModal?.addEventListener('click', () => closeCheckout());
   el.checkoutModalOverlay?.addEventListener('click', (e) => {
     if (e.target === el.checkoutModalOverlay) closeCheckout();
-  });
-
-  document.querySelectorAll('[data-provider]').forEach((button) => {
-    button.addEventListener('click', () => {
-      const provider = button.dataset.provider.toLowerCase();
-      el.socialLoginNote.textContent = `Abrindo login ${button.dataset.provider}...`;
-      window.location.assign(`/api/auth/oauth/${provider}`);
-    });
   });
 
   document.querySelectorAll('[data-plan]').forEach((button) => {
@@ -312,9 +302,9 @@ document.addEventListener('DOMContentLoaded', () => {
       console.log('[AUTH][LOGIN] resposta API', { status: res.status, ok: res.ok, dados: data });
       if (!res.ok) throw new Error(data.error || 'Erro ao entrar');
       authRequestVersion += 1;
-      currentUser = data.user;
-      console.log('[AUTH][LOGIN] sessão recebida', { usuarioId: currentUser?.id, email: currentUser?.email, cookieVisivel: document.cookie.includes('oficina_token') });
-      renderAccountArea();
+      await fetchMe();
+      if (!currentUser) throw new Error('A sessão não pôde ser confirmada. Tente novamente.');
+      console.log('[AUTH][LOGIN] sessão confirmada', { usuarioId: currentUser.id, email: currentUser.email });
       closeModal();
       continuePendingAction();
     } catch (err) {
@@ -346,10 +336,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Erro ao criar conta');
       authRequestVersion += 1;
-      currentUser = data.user;
-      renderAccountArea();
+      await fetchMe();
+      if (!currentUser) throw new Error('A sessão não pôde ser confirmada. Tente novamente.');
       closeModal();
-      window.dispatchEvent(new CustomEvent('chequetto:authenticated'));
       continuePendingAction();
     } catch (err) {
       el.signupError.textContent = err.message;

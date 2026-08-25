@@ -133,19 +133,13 @@
         <p class="auth-kicker">CHEQUETTO / ACESSO</p>
         <h2>Entre para construir.</h2>
         <p class="auth-lead">Seu trabalho fica salvo e você pode continuar de onde parou.</p>
-        <div class="social-login" aria-label="Opções de login social">
-          <button class="social-login__button" type="button" data-provider="Google">Google</button>
-          <button class="social-login__button" type="button" data-provider="GitHub">GitHub</button>
-        </div>
-        <p class="auth-social-note" id="socialLoginNote"></p>
-        <div class="auth-divider"><span>ou use seu e-mail</span></div>
         <div class="auth-tabs">
           <button class="auth-tab is-active" id="authTabLogin" type="button">Entrar</button>
           <button class="auth-tab" id="authTabSignup" type="button">Criar conta</button>
         </div>
         <form id="formLogin" method="post" action="/api/auth/login">
           <div class="auth-field"><input type="email" id="loginEmail" name="email" autocomplete="username" placeholder="Email" required></div>
-          <div class="auth-field"><input type="password" id="loginPassword" name="password" autocomplete="current-password" placeholder="Senha" required></div>
+          <div class="auth-field"><label for="loginPassword">Senha</label><input type="password" id="loginPassword" name="password" autocomplete="current-password" placeholder="Digite sua senha" required></div>
           <p class="auth-error" id="loginError"></p>
           <button class="btn-primary auth-submit" type="submit">Entrar</button>
         </form>

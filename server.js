@@ -6,8 +6,6 @@ const mammoth = require('mammoth');
 const XLSX = require('xlsx');
 const dotenv = require('dotenv');
 dotenv.config();
-const crypto = require('crypto');
-
 const cookieParser = require('cookie-parser');
 const { gerarComGemini, refinarComGemini, getApiKeys } = require('./gemini-manager');
 const {
@@ -52,36 +50,6 @@ function publicUser(user) {
     unlimited: !!user.unlimited_credits,
     referralCode: user.referral_code,
   };
-}
-
-function oauthRedirectUri(req, provider) {
-  const baseUrl = process.env.PUBLIC_URL || `${req.protocol}://${req.get('host')}`;
-  return `${baseUrl}/api/auth/oauth/${provider}/callback`;
-}
-
-function oauthConfig(provider, req) {
-  const redirectUri = oauthRedirectUri(req, provider);
-  if (provider === 'google' && process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) {
-    return {
-      authorizeUrl: `https://accounts.google.com/o/oauth2/v2/auth?client_id=${encodeURIComponent(process.env.GOOGLE_CLIENT_ID)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent('openid email profile')}&access_type=online&prompt=select_account`,
-      tokenUrl: 'https://oauth2.googleapis.com/token', clientId: process.env.GOOGLE_CLIENT_ID,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET, redirectUri,
-    };
-  }
-  if (provider === 'github' && process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
-    return {
-      authorizeUrl: `https://github.com/login/oauth/authorize?client_id=${encodeURIComponent(process.env.GITHUB_CLIENT_ID)}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${encodeURIComponent('read:user user:email')}`,
-      tokenUrl: 'https://github.com/login/oauth/access_token', clientId: process.env.GITHUB_CLIENT_ID,
-      clientSecret: process.env.GITHUB_CLIENT_SECRET, redirectUri,
-    };
-  }
-  return null;
-}
-
-function finishLogin(res, user) {
-  const token = signUserToken(user);
-  res.cookie('oficina_token', token, { httpOnly: true, sameSite: 'lax', maxAge: 30 * 24 * 3600 * 1000 });
-  return res.redirect('/');
 }
 
 // tenta pegar o usuário logado, sem exigir login (gerar app funciona sem conta também)
@@ -185,55 +153,6 @@ app.post('/api/auth/signup', (req, res) => {
     user: publicUser(user),
     ipSignupWarning: countSignupsByIp(ip) >= 3 ? 'Várias contas criadas a partir deste IP' : null,
   });
-});
-
-app.get('/api/auth/oauth/:provider', (req, res) => {
-  const provider = String(req.params.provider || '').toLowerCase();
-  if (!['google', 'github'].includes(provider)) return res.status(404).send('Provedor OAuth inválido.');
-  const config = oauthConfig(provider, req);
-  if (!config) return res.redirect(`/?oauth_error=${encodeURIComponent(`Configure as credenciais OAuth do ${provider}.`)}`);
-  const state = crypto.randomBytes(24).toString('hex');
-  res.cookie(`oauth_state_${provider}`, state, { httpOnly: true, sameSite: 'lax', secure: req.secure, maxAge: 10 * 60 * 1000 });
-  res.redirect(`${config.authorizeUrl}&state=${state}`);
-});
-
-app.get('/api/auth/oauth/:provider/callback', async (req, res) => {
-  const provider = String(req.params.provider || '').toLowerCase();
-  const config = oauthConfig(provider, req);
-  const expectedState = req.cookies && req.cookies[`oauth_state_${provider}`];
-  res.clearCookie(`oauth_state_${provider}`);
-  if (!config || !req.query.code || !expectedState || expectedState !== req.query.state) {
-    return res.redirect('/?oauth_error=Não foi possível validar o login social.');
-  }
-  try {
-    const tokenResponse = await fetch(config.tokenUrl, {
-      method: 'POST',
-      headers: { Accept: 'application/json', 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({ client_id: config.clientId, client_secret: config.clientSecret, code: req.query.code, redirect_uri: config.redirectUri }).toString(),
-    });
-    const tokenData = await tokenResponse.json();
-    if (!tokenResponse.ok || !tokenData.access_token) throw new Error('Não foi possível obter o token OAuth.');
-    let profile;
-    if (provider === 'google') {
-      const response = await fetch('https://openidconnect.googleapis.com/v1/userinfo', { headers: { Authorization: `Bearer ${tokenData.access_token}` } });
-      profile = await response.json();
-    } else {
-      const response = await fetch('https://api.github.com/user', { headers: { Authorization: `Bearer ${tokenData.access_token}`, Accept: 'application/vnd.github+json', 'User-Agent': 'Chequetto' } });
-      profile = await response.json();
-      if (!profile.email) {
-        const responseEmails = await fetch('https://api.github.com/user/emails', { headers: { Authorization: `Bearer ${tokenData.access_token}`, Accept: 'application/vnd.github+json', 'User-Agent': 'Chequetto' } });
-        const emails = await responseEmails.json();
-        profile.email = emails.find((item) => item.primary && item.verified)?.email || emails.find((item) => item.verified)?.email;
-      }
-    }
-    const email = String(profile.email || '').trim().toLowerCase();
-    if (!email) throw new Error('O provedor não retornou um e-mail verificado.');
-    const user = getUserByEmail(email) || createUser({ email, name: profile.name || profile.login, signupIp: clientIp(req) });
-    return finishLogin(res, user);
-  } catch (error) {
-    console.error(`Erro no OAuth ${provider}:`, error);
-    return res.redirect(`/?oauth_error=${encodeURIComponent(error.message || 'Falha no login social.')}`);
-  }
 });
 
 app.post('/api/auth/login', (req, res) => {
