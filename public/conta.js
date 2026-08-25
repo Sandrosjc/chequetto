@@ -169,7 +169,11 @@ document.addEventListener('DOMContentLoaded', () => {
   async function fetchMe() {
     try {
       const oauthError = new URLSearchParams(window.location.search).get('oauth_error');
-      if (oauthError && el.socialLoginNote) el.socialLoginNote.textContent = oauthError;
+      if (oauthError) {
+        if (el.socialLoginNote) el.socialLoginNote.textContent = oauthError;
+        openModal();
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
       const res = await fetch('/api/me');
       if (!res.ok) {
         currentUser = null;
