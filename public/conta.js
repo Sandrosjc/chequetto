@@ -284,9 +284,10 @@ document.addEventListener('DOMContentLoaded', () => {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: el.loginEmail.value, password: el.loginPassword.value }),
+        credentials: 'same-origin',
+        body: JSON.stringify({ email: el.loginEmail.value.trim().toLowerCase(), password: el.loginPassword.value }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Erro ao entrar');
       currentUser = data.user;
       renderAccountArea();
@@ -307,14 +308,15 @@ document.addEventListener('DOMContentLoaded', () => {
       const res = await fetch('/api/auth/signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
         body: JSON.stringify({
           name: el.signupName.value,
-          email: el.signupEmail.value,
+          email: el.signupEmail.value.trim().toLowerCase(),
           password: el.signupPassword.value,
           referralCode,
         }),
       });
-      const data = await res.json();
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Erro ao criar conta');
       currentUser = data.user;
       renderAccountArea();
