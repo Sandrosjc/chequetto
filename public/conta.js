@@ -36,6 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   let currentUser = null;
+  let authRequestVersion = 0;
   let authLoading = true;
   let resolveAuthReady;
   const authReady = new Promise((resolve) => {
@@ -174,6 +175,7 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   async function fetchMe() {
+    const requestVersion = authRequestVersion;
     try {
       const oauthError = new URLSearchParams(window.location.search).get('oauth_error');
       const authError = new URLSearchParams(window.location.search).get('auth_error');
@@ -184,15 +186,18 @@ document.addEventListener('DOMContentLoaded', () => {
         window.history.replaceState({}, document.title, window.location.pathname);
       }
       const res = await fetch('/api/me');
+      if (requestVersion !== authRequestVersion) return;
       if (!res.ok) {
         currentUser = null;
         renderAccountArea();
         return;
       }
       const data = await res.json();
+      if (requestVersion !== authRequestVersion) return;
       currentUser = data.user;
       renderAccountArea();
     } catch {
+      if (requestVersion !== authRequestVersion) return;
       currentUser = null;
       renderAccountArea();
     } finally {
@@ -306,6 +311,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const data = await res.json().catch(() => ({}));
       console.log('[AUTH][LOGIN] resposta API', { status: res.status, ok: res.ok, dados: data });
       if (!res.ok) throw new Error(data.error || 'Erro ao entrar');
+      authRequestVersion += 1;
       currentUser = data.user;
       console.log('[AUTH][LOGIN] sessão recebida', { usuarioId: currentUser?.id, email: currentUser?.email, cookieVisivel: document.cookie.includes('oficina_token') });
       renderAccountArea();
@@ -339,10 +345,10 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Erro ao criar conta');
+      authRequestVersion += 1;
       currentUser = data.user;
       renderAccountArea();
       closeModal();
-      window.dispatchEvent(new CustomEvent('chequetto:authenticated'));
       window.dispatchEvent(new CustomEvent('chequetto:authenticated'));
       continuePendingAction();
     } catch (err) {
