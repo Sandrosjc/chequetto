@@ -1,6 +1,7 @@
 // auth.js — login (JWT em cookie) + senha de hash. Formato CommonJS.
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
+const { getUserById } = require('./db');
 
 const JWT_SECRET = process.env.JWT_SECRET;
 console.log('[AUTH][ENV] JWT_SECRET', { configurado: Boolean(JWT_SECRET), tamanho: JWT_SECRET?.length || 0 });
@@ -26,6 +27,11 @@ function requireAuth(req, res, next) {
   const payload = token && verifyToken(token);
   console.log('[AUTH][SESSION] cookie validado', { recebido: Boolean(token), valido: Boolean(payload), rota: req.originalUrl });
   if (!payload) return res.status(401).json({ error: 'Não autenticado' });
+  const user = getUserById(payload.uid);
+  if (!user || !(user.email_verified_at || user.is_verified)) {
+    res.clearCookie('oficina_token');
+    return res.status(401).json({ error: 'E-mail não verificado' });
+  }
   req.userId = payload.uid;
   next();
 }

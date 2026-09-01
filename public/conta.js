@@ -14,10 +14,16 @@ document.addEventListener('DOMContentLoaded', () => {
     loginEmail: document.getElementById('loginEmail'),
     loginPassword: document.getElementById('loginPassword'),
     loginError: document.getElementById('loginError'),
+    formLoginVerification: document.getElementById('formLoginVerification'),
+    loginVerificationCode: document.getElementById('loginVerificationCode'),
+    loginVerificationError: document.getElementById('loginVerificationError'),
     signupName: document.getElementById('signupName'),
     signupEmail: document.getElementById('signupEmail'),
     signupPassword: document.getElementById('signupPassword'),
     signupError: document.getElementById('signupError'),
+    formSignupVerification: document.getElementById('formSignupVerification'),
+    signupVerificationCode: document.getElementById('signupVerificationCode'),
+    signupVerificationError: document.getElementById('signupVerificationError'),
     planNote: document.getElementById('planNote'),
     closeModal: document.getElementById('closeAuthModal'),
     checkoutModalOverlay: document.getElementById('checkoutModalOverlay'),
@@ -154,6 +160,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (el.tabSignup) el.tabSignup.classList.toggle('is-active', !isLogin);
     if (el.formLogin) el.formLogin.hidden = !isLogin;
     if (el.formSignup) el.formSignup.hidden = isLogin;
+    if (el.formLoginVerification) el.formLoginVerification.hidden = true;
+    if (el.formSignupVerification) el.formSignupVerification.hidden = true;
     if (el.authTitle) el.authTitle.textContent = isLogin ? 'Entre para construir.' : 'Crie sua conta.';
     if (el.authLead) el.authLead.textContent = isLogin
       ? 'Seu trabalho fica salvo e você pode continuar de onde parou.'
@@ -184,9 +192,15 @@ document.addEventListener('DOMContentLoaded', () => {
   async function fetchMe() {
     const requestVersion = authRequestVersion;
     try {
-      const authError = new URLSearchParams(window.location.search).get('auth_error');
+      const authParams = new URLSearchParams(window.location.search);
+      const authError = authParams.get('auth_error');
+      const authMessage = authParams.get('auth_message');
       if (authError) {
         if (el.loginError) el.loginError.textContent = authError || '';
+        openModal();
+        window.history.replaceState({}, document.title, window.location.pathname);
+      } else if (authMessage) {
+        if (el.authLead) el.authLead.textContent = authMessage;
         openModal();
         window.history.replaceState({}, document.title, window.location.pathname);
       }
@@ -299,9 +313,7 @@ document.addEventListener('DOMContentLoaded', () => {
   el.formLogin?.addEventListener('submit', async (e) => {
     e.preventDefault();
     el.loginError.textContent = '';
-    console.log('[AUTH][LOGIN] captura', { email: el.loginEmail?.value?.trim().toLowerCase(), senhaPreenchida: Boolean(el.loginPassword?.value), tamanhoSenha: el.loginPassword?.value?.length || 0 });
     try {
-      console.log('[AUTH][LOGIN] chamada API', { endpoint: '/api/auth/login', credentials: 'same-origin' });
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -309,17 +321,36 @@ document.addEventListener('DOMContentLoaded', () => {
         body: JSON.stringify({ email: el.loginEmail.value.trim().toLowerCase(), password: el.loginPassword.value }),
       });
       const data = await res.json().catch(() => ({}));
-      console.log('[AUTH][LOGIN] resposta API', { status: res.status, ok: res.ok, dados: data });
       if (!res.ok) throw new Error(data.error || 'Erro ao entrar');
       authRequestVersion += 1;
       await fetchMe();
       if (!currentUser) throw new Error('A sessão não pôde ser confirmada. Tente novamente.');
-      console.log('[AUTH][LOGIN] sessão confirmada', { usuarioId: currentUser.id, email: currentUser.email });
       closeModal();
       continuePendingAction();
     } catch (err) {
-      console.error('[AUTH][LOGIN] erro', { name: err.name, message: err.message, stack: err.stack });
       el.loginError.textContent = err.message;
+    }
+  });
+
+  el.formLoginVerification?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    el.loginVerificationError.textContent = '';
+    try {
+      const res = await fetch('/api/auth/login/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ email: el.loginEmail.value.trim().toLowerCase(), code: el.loginVerificationCode.value.trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Código inválido');
+      authRequestVersion += 1;
+      await fetchMe();
+      if (!currentUser) throw new Error('A sessão não pôde ser confirmada. Tente novamente.');
+      closeModal();
+      continuePendingAction();
+    } catch (err) {
+      el.loginVerificationError.textContent = err.message;
     }
   });
 
@@ -332,7 +363,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const referralField = document.getElementById('signupReferralCode');
       if (referralField) referralField.value = referralCode || '';
 
-      const res = await fetch('/api/auth/signup', {
+      const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
@@ -345,17 +376,42 @@ document.addEventListener('DOMContentLoaded', () => {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Erro ao criar conta');
+      el.formSignup.hidden = true;
+      el.formSignupVerification.hidden = true;
+      if (el.authLead) el.authLead.textContent = data.message || 'Cadastro criado. Verifique seu e-mail para ativar a conta.';
+    } catch (err) {
+      el.signupError.textContent = err.message;
+    }
+  });
+
+  el.formSignupVerification?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    el.signupVerificationError.textContent = '';
+    try {
+      const res = await fetch('/api/auth/signup/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ email: el.signupEmail.value.trim().toLowerCase(), code: el.signupVerificationCode.value.trim() }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || 'Código inválido');
       authRequestVersion += 1;
       await fetchMe();
       if (!currentUser) throw new Error('A sessão não pôde ser confirmada. Tente novamente.');
       closeModal();
       continuePendingAction();
     } catch (err) {
-      el.signupError.textContent = err.message;
+      el.signupVerificationError.textContent = err.message;
     }
   });
 
   renderCheckoutSummary();
   startOfferCountdown();
+  const authParams = new URLSearchParams(window.location.search);
+  const authMessage = authParams.get('auth_message');
+  const authError = authParams.get('auth_error');
+  if (authMessage && el.authLead) el.authLead.textContent = authMessage;
+  if (authError && el.loginError) el.loginError.textContent = authError;
   fetchMe();
 });
