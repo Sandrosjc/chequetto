@@ -22,7 +22,7 @@ const {
   createPendingSubscription,
   setUnlimited,
 } = require('./db');
-const { signUserToken, hashPassword, comparePassword } = require('./auth');
+const { hashPassword, comparePassword } = require('./auth');
 const plans = require('./plans.json');
 
 const app = express();
@@ -119,6 +119,33 @@ function asaasSubscriptionCycle(plan) {
   return { month: 'MONTHLY', quarter: 'QUARTERLY', year: 'ANNUALLY' }[plan.interval];
 }
 
+// =============================================
+// USUÁRIO PADRÃO PARA TODAS AS ROTAS
+// =============================================
+let defaultUser = null;
+
+function getDefaultUser() {
+  if (!defaultUser) {
+    // Cria um usuário padrão se não existir
+    const existing = getUserByEmail('default@system.com');
+    if (existing) {
+      defaultUser = existing;
+    } else {
+      defaultUser = createUser({
+        email: 'default@system.com',
+        name: 'Usuário Padrão',
+        password: hashPassword('default123'),
+        signupIp: 'system',
+      });
+    }
+  }
+  return defaultUser;
+}
+
+// =============================================
+// ROTAS PÚBLICAS (SEM LOGIN)
+// =============================================
+
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', keysLoaded: keys.length });
 });
@@ -179,98 +206,11 @@ app.use('/api/files/extract', (error, req, res, next) => {
 });
 
 // =============================================
-// FUNÇÃO PARA VERIFICAR TOKEN
-// =============================================
-function getUserIdFromToken(req) {
-  const token = req.cookies && req.cookies.oficina_token;
-  if (!token) return null;
-  try {
-    const { verifyToken } = require('./auth');
-    const payload = verifyToken(token);
-    return payload ? payload.uid : null;
-  } catch {
-    return null;
-  }
-}
-
-// =============================================
-// CADASTRO E LOGIN (MANTIDOS)
-// =============================================
-
-function validEmail(email) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
-}
-
-function issueSession(res, user) {
-  const token = signUserToken(user);
-  res.cookie('oficina_token', token, { httpOnly: true, sameSite: 'lax', maxAge: 30 * 24 * 3600 * 1000 });
-}
-
-app.post('/api/auth/signup', (req, res) => {
-  const { email, password, name } = req.body || {};
-  const finalEmail = (email || '').trim().toLowerCase();
-
-  if (!validEmail(finalEmail)) {
-    return res.status(400).json({ error: 'Informe um e-mail válido.' });
-  }
-
-  if (!password || password.length < 6) {
-    return res.status(400).json({ error: 'A senha precisa ter pelo menos 6 caracteres.' });
-  }
-
-  if (getUserByEmail(finalEmail)) {
-    return res.status(409).json({ error: 'Este e-mail já está cadastrado.' });
-  }
-
-  const user = createUser({
-    email: finalEmail,
-    name: name || '',
-    password: hashPassword(password),
-    signupIp: clientIp(req),
-  });
-
-  issueSession(res, user);
-  res.json({ user: publicUser(user) });
-});
-
-app.post('/api/auth/login', (req, res) => {
-  const { email, password } = req.body || {};
-  const finalEmail = (email || '').trim().toLowerCase();
-
-  if (!validEmail(finalEmail)) {
-    return res.status(400).json({ error: 'Informe um e-mail válido.' });
-  }
-
-  const user = getUserByEmail(finalEmail);
-
-  if (!user || !user.password_hash || !comparePassword(password, user.password_hash)) {
-    return res.status(401).json({ error: 'E-mail ou senha inválidos.' });
-  }
-
-  issueSession(res, user);
-  res.json({ user: publicUser(user) });
-});
-
-app.post('/api/auth/logout', (req, res) => {
-  res.clearCookie('oficina_token');
-  res.json({ ok: true });
-});
-
-app.get('/api/me', (req, res) => {
-  const userId = getUserIdFromToken(req);
-  if (!userId) return res.status(401).json({ error: 'Não autenticado' });
-  const user = getUserById(userId);
-  res.json({ user: publicUser(user), nextTier: invitesRequiredForNextTier(user) });
-});
-
-// =============================================
-// ROTAS DE PAGAMENTO
+// ROTAS DE PAGAMENTO (COM USUÁRIO PADRÃO)
 // =============================================
 
 app.post('/api/billing/checkout', async (req, res) => {
-  const userId = getUserIdFromToken(req);
-  if (!userId) return res.status(401).json({ error: 'Não autenticado' });
-  
+  const user = getDefaultUser();
   const { planId } = req.body || {};
   const plan = plans[planId];
   if (!plan || planId === 'gratis') {
@@ -278,7 +218,6 @@ app.post('/api/billing/checkout', async (req, res) => {
   }
 
   try {
-    const user = getUserById(userId);
     const isRecurring = plan.type !== 'unico';
     const paymentLink = await asaasRequest('/paymentLinks', {
       method: 'POST',
@@ -331,7 +270,7 @@ app.post('/api/billing/asaas/webhook', (req, res) => {
 });
 
 // =============================================
-// ROTAS DE GERAÇÃO (SEM LOGIN OBRIGATÓRIO)
+// ROTAS DE GERAÇÃO (SEM LOGIN)
 // =============================================
 
 app.get('/generate/stream', async (req, res) => {
@@ -341,16 +280,7 @@ app.get('/generate/stream', async (req, res) => {
     return;
   }
 
-  const userId = getUserIdFromToken(req);
-  const user = userId ? getUserById(userId) : null;
-
-  if (user) {
-    const freeLimitReached = !user.unlimited_credits && user.credits <= 0;
-    if (freeLimitReached) {
-      res.status(402).json({ error: 'Limite de créditos do plano grátis atingido.' });
-      return;
-    }
-  }
+  const user = getDefaultUser();
 
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -360,11 +290,6 @@ app.get('/generate/stream', async (req, res) => {
   const send = (data) => res.write(`data: ${JSON.stringify(data)}\n\n`);
 
   try {
-    if (user && !user.unlimited_credits) {
-      const updatedUser = require('./db').deductCredit(user.id);
-      if (!updatedUser) throw new Error('Não foi possível atualizar os créditos.');
-    }
-
     const { html, plano } = await gerarComGemini(prompt, [], (step) => send(step), req.query.lang);
     send({ stage: 'salvo_temp', html, plano });
   } catch (error) {
@@ -380,18 +305,6 @@ app.post('/generate', async (req, res) => {
     const { prompt } = req.body;
     if (!prompt) {
       return res.status(400).json({ error: 'Prompt não fornecido' });
-    }
-
-    const userId = getUserIdFromToken(req);
-    const user = userId ? getUserById(userId) : null;
-
-    if (user) {
-      if (!user.unlimited_credits && user.credits <= 0) {
-        return res.status(402).json({ error: 'Limite de créditos do plano grátis atingido.' });
-      }
-      if (!user.unlimited_credits) {
-        require('./db').deductCredit(user.id);
-      }
     }
 
     const { html, plano } = await gerarComGemini(prompt, [], () => {});
@@ -415,42 +328,27 @@ app.post('/refine', async (req, res) => {
 });
 
 // =============================================
-// ROTAS DE PROJETOS
+// ROTAS DE PROJETOS (SEM LOGIN)
 // =============================================
 
 app.post('/api/projects/save', async (req, res) => {
   const { prompt, plano, html, nome } = req.body || {};
   if (!html || !prompt) return res.status(400).json({ error: 'Dados incompletos para salvar' });
 
-  let userId = getUserIdFromToken(req);
-  
-  if (!userId) {
-    const anonUser = createUser({
-      email: `anon_${Date.now()}@temp.com`,
-      name: 'Anônimo',
-      password: hashPassword(crypto.randomBytes(16).toString('hex')),
-      signupIp: clientIp(req),
-    });
-    userId = anonUser.id;
-    // Cria sessão para o usuário anônimo
-    issueSession(res, anonUser);
-  }
+  const user = getDefaultUser();
 
-  const project = saveProject({ userId, prompt, plano, html, nome });
+  const project = saveProject({ userId: user.id, prompt, plano, html, nome });
   res.json({ project: { id: project.id, nome: project.nome, created_at: project.created_at } });
 });
 
 app.get('/api/projects', async (req, res) => {
-  const userId = getUserIdFromToken(req);
-  if (!userId) return res.json({ projects: [] });
-  res.json({ projects: listProjectsByUser(userId) });
+  const user = getDefaultUser();
+  res.json({ projects: listProjectsByUser(user.id) });
 });
 
 app.get('/api/projects/:id', async (req, res) => {
-  const userId = getUserIdFromToken(req);
   const project = getProjectById(req.params.id);
   if (!project) return res.status(404).json({ error: 'Não encontrado' });
-  if (project.user_id !== userId) return res.status(403).json({ error: 'Não autorizado' });
   project.plano = JSON.parse(project.plano || '[]');
   res.json({ project });
 });
@@ -459,4 +357,5 @@ app.listen(PORT, () => {
   console.log(`🚀 Servidor rodando na porta ${PORT}`);
   console.log(`   Chaves carregadas: ${keys.length}`);
   console.log(`Servidor rodando com sucesso!`);
+  console.log(`✅ SEM LOGIN - Todos podem usar!`);
 });
