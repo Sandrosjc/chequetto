@@ -21,11 +21,6 @@ const {
   listProjectsByUser,
   createPendingSubscription,
   setUnlimited,
-  saveAuthVerification,
-  getAuthVerification,
-  incrementAuthVerificationAttempts,
-  deleteAuthVerification,
-  markEmailVerified,
 } = require('./db');
 const { signUserToken, requireAuth, hashPassword, comparePassword } = require('./auth');
 const plans = require('./plans.json');
@@ -83,7 +78,6 @@ function asaasSubscriptionCycle(plan) {
   return { month: 'MONTHLY', quarter: 'QUARTERLY', year: 'ANNUALLY' }[plan.interval];
 }
 
-// tenta pegar o usuário logado, sem exigir login (gerar app funciona sem conta também)
 function tryGetUser(req) {
   const token = req.cookies && req.cookies.oficina_token;
   if (!token) return null;
@@ -154,62 +148,71 @@ app.use('/api/files/extract', (error, req, res, next) => {
   res.status(400).json({ error: message });
 });
 
-// ---------- Auth ----------
+// =============================================
+// 🔥 LOGIN E CADASTRO SIMPLES (SEM EMAIL)
+// =============================================
 
-function normalizeEmail(email) {
-  return (email || '').trim().toLowerCase();
-}
+// CADASTRO SIMPLES
+app.post('/api/auth/signup', (req, res) => {
+  const { email, password, name, referralCode } = req.body || {};
+  const finalEmail = (email || '').trim().toLowerCase();
 
+  if (!validEmail(finalEmail)) {
+    return res.status(400).json({ error: 'Informe um e-mail válido.' });
+  }
+
+  if (!password || password.length < 6) {
+    return res.status(400).json({ error: 'A senha precisa ter pelo menos 6 caracteres.' });
+  }
+
+  if (getUserByEmail(finalEmail)) {
+    return res.status(409).json({ error: 'Este e-mail já está cadastrado.' });
+  }
+
+  const user = createUser({
+    email: finalEmail,
+    name: name || '',
+    password: hashPassword(password),
+    referralCode: referralCode || null,
+    signupIp: clientIp(req),
+  });
+
+  if (user.referred_by) {
+    applyInviteBonusIfNeeded(user.id);
+  }
+
+  issueSession(res, user);
+  res.json({ user: publicUser(user) });
+});
+
+// LOGIN SIMPLES
+app.post('/api/auth/login', (req, res) => {
+  const { email, password } = req.body || {};
+  const finalEmail = (email || '').trim().toLowerCase();
+
+  if (!validEmail(finalEmail)) {
+    return res.status(400).json({ error: 'Informe um e-mail válido.' });
+  }
+
+  const user = getUserByEmail(finalEmail);
+
+  if (!user || !user.password_hash || !comparePassword(password, user.password_hash)) {
+    return res.status(401).json({ error: 'E-mail ou senha inválidos.' });
+  }
+
+  issueSession(res, user);
+  res.json({ user: publicUser(user) });
+});
+
+// LOGOUT
+app.post('/api/auth/logout', (req, res) => {
+  res.clearCookie('oficina_token');
+  res.json({ ok: true });
+});
+
+// FUNÇÕES AUXILIARES
 function validEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
-}
-
-function hashVerificationCode(code) {
-  return crypto.createHash('sha256').update(code).digest('hex');
-}
-
-async function sendVerificationCode(email, code) {
-  if (!process.env.RESEND_API_KEY || !process.env.AUTH_FROM_EMAIL) {
-    throw new Error('O envio de códigos não está configurado no servidor.');
-  }
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      from: process.env.AUTH_FROM_EMAIL,
-      to: [email],
-      subject: 'Seu código de verificação Chequetto',
-      text: `Seu código de verificação é ${code}. Ele expira em 10 minutos.`,
-    }),
-  });
-  if (!response.ok) throw new Error('Não foi possível enviar o código de verificação.');
-}
-
-async function issueVerificationCode(email, purpose, payload) {
-  const code = String(crypto.randomInt(100000, 1000000));
-  saveAuthVerification({
-    email,
-    purpose,
-    codeHash: hashVerificationCode(code),
-    payload,
-    expiresAt: Date.now() + 10 * 60 * 1000,
-  });
-  try {
-    await sendVerificationCode(email, code);
-  } catch (error) {
-    deleteAuthVerification(email, purpose);
-    throw error;
-  }
-}
-
-function verificationMatches(record, code) {
-  if (!record || record.expires_at < Date.now() || record.attempts >= 5) return false;
-  const expected = Buffer.from(record.code_hash, 'hex');
-  const received = Buffer.from(hashVerificationCode(String(code || '')), 'hex');
-  return expected.length === received.length && crypto.timingSafeEqual(expected, received);
 }
 
 function issueSession(res, user) {
@@ -217,72 +220,9 @@ function issueSession(res, user) {
   res.cookie('oficina_token', token, { httpOnly: true, sameSite: 'lax', maxAge: 30 * 24 * 3600 * 1000 });
 }
 
-app.post('/api/auth/signup/request-code', async (req, res) => {
-  const { email, password, name, referralCode } = req.body || {};
-  const finalEmail = normalizeEmail(email);
-  if (!validEmail(finalEmail) || !password) return res.status(400).json({ error: 'Informe um e-mail válido e uma senha.' });
-  if (password.length < 6) return res.status(400).json({ error: 'A senha precisa ter pelo menos 6 caracteres.' });
-  if (getUserByEmail(finalEmail)) return res.status(409).json({ error: 'Este e-mail já está cadastrado.' });
-  try {
-    await issueVerificationCode(finalEmail, 'signup', {
-      name, passwordHash: hashPassword(password), referralCode, signupIp: clientIp(req),
-    });
-    res.json({ message: 'Código de verificação enviado para seu e-mail.' });
-  } catch (error) {
-    res.status(503).json({ error: error.message });
-  }
-});
-
-app.post('/api/auth/signup/verify', (req, res) => {
-  const finalEmail = normalizeEmail(req.body?.email);
-  const record = getAuthVerification(finalEmail, 'signup');
-  if (!verificationMatches(record, req.body?.code)) {
-    if (record) incrementAuthVerificationAttempts(finalEmail, 'signup');
-    return res.status(401).json({ error: 'Código inválido ou expirado.' });
-  }
-  const payload = JSON.parse(record.payload || '{}');
-  if (getUserByEmail(finalEmail)) return res.status(409).json({ error: 'Este e-mail já está cadastrado.' });
-  const user = createUser({ email: finalEmail, ...payload });
-  markEmailVerified(user.id);
-  deleteAuthVerification(finalEmail, 'signup');
-  if (user.referred_by) applyInviteBonusIfNeeded(user.id);
-  issueSession(res, user);
-  res.json({ user: publicUser(getUserByEmail(finalEmail)) });
-});
-
-app.post('/api/auth/login/request-code', async (req, res) => {
-  const { email, password } = req.body || {};
-  const finalEmail = normalizeEmail(email);
-  if (!validEmail(finalEmail) || !password) return res.status(400).json({ error: 'Informe e-mail e senha.' });
-  const user = getUserByEmail(finalEmail);
-  if (!user || !user.password_hash || !comparePassword(password, user.password_hash)) return res.status(401).json({ error: 'E-mail ou senha inválidos.' });
-  try {
-    await issueVerificationCode(finalEmail, 'login', null);
-    res.json({ message: 'Código de verificação enviado para seu e-mail.' });
-  } catch (error) {
-    res.status(503).json({ error: error.message });
-  }
-});
-
-app.post('/api/auth/login/verify', (req, res) => {
-  const finalEmail = normalizeEmail(req.body?.email);
-  const record = getAuthVerification(finalEmail, 'login');
-  if (!verificationMatches(record, req.body?.code)) {
-    if (record) incrementAuthVerificationAttempts(finalEmail, 'login');
-    return res.status(401).json({ error: 'Código inválido ou expirado.' });
-  }
-  const user = getUserByEmail(finalEmail);
-  if (!user) return res.status(401).json({ error: 'A conta não existe.' });
-  markEmailVerified(user.id);
-  deleteAuthVerification(finalEmail, 'login');
-  issueSession(res, user);
-  return res.json({ user: publicUser(getUserByEmail(finalEmail)) });
-});
-
-app.post('/api/auth/logout', (req, res) => {
-  res.clearCookie('oficina_token');
-  res.json({ ok: true });
-});
+// =============================================
+// FIM DO LOGIN SIMPLES
+// =============================================
 
 app.get('/api/me', requireAuth, (req, res) => {
   const user = getUserById(req.userId);
@@ -388,7 +328,6 @@ app.get('/generate/stream', requireAuth, async (req, res) => {
   }
 });
 
-// mantém a rota antiga funcionando também, sem streaming, pra compatibilidade
 app.post('/generate', requireAuth, async (req, res) => {
   try {
     const { prompt } = req.body;
