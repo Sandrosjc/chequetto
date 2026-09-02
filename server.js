@@ -32,12 +32,9 @@ const upload = multer({
   limits: { files: 10, fileSize: 50 * 1024 * 1024 },
 });
 
-// =============================================
-// CRIAR TABELAS AUTOMATICAMENTE AO INICIAR
-// =============================================
+// CRIAR TABELAS AUTOMATICAMENTE
 const Database = require('better-sqlite3');
 const db = new Database('database.db');
-
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -51,7 +48,6 @@ db.exec(`
     unlimited_credits INTEGER DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   );
-
   CREATE TABLE IF NOT EXISTS projects (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
@@ -62,7 +58,6 @@ db.exec(`
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id)
   );
-
   CREATE TABLE IF NOT EXISTS subscriptions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
@@ -76,8 +71,7 @@ db.exec(`
     FOREIGN KEY (user_id) REFERENCES users(id)
   );
 `);
-
-console.log('✅ Banco de dados verificado/criado!');
+console.log('✅ Banco de dados pronto!');
 
 const keys = getApiKeys();
 const ASAAS_API_URL = process.env.ASAAS_API_URL || 'https://api.asaas.com/v3';
@@ -103,7 +97,7 @@ function publicUser(user) {
 }
 
 async function asaasRequest(endpoint, options = {}) {
-  if (!process.env.ASAAS_API_KEY) throw new Error('ASAAS_API_KEY não configurada no servidor.');
+  if (!process.env.ASAAS_API_KEY) throw new Error('ASAAS_API_KEY não configurada.');
   const response = await fetch(`${ASAAS_API_URL}${endpoint}`, {
     ...options,
     headers: {
@@ -116,7 +110,7 @@ async function asaasRequest(endpoint, options = {}) {
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     const detail = data.errors?.map((item) => item.description).join(', ');
-    throw new Error(detail || data.message || `Asaas respondeu com HTTP ${response.status}.`);
+    throw new Error(detail || data.message || `Erro HTTP ${response.status}.`);
   }
   return data;
 }
@@ -153,7 +147,6 @@ app.post('/api/files/extract', (req, res, next) => {
       const extension = path.extname(file.originalname).toLowerCase();
       let text = '';
       let readable = true;
-
       if (extension === '.pdf' || file.mimetype === 'application/pdf') {
         text = (await pdfParse(file.buffer)).text;
       } else if (extension === '.docx') {
@@ -171,12 +164,11 @@ app.post('/api/files/extract', (req, res, next) => {
         if (!binary) text = file.buffer.toString('utf8');
         else readable = false;
       }
-
       return {
         name: file.originalname,
         readable,
         text: text.trim().slice(0, 50000),
-        message: readable ? undefined : 'Formato anexado sem extração de texto disponível.',
+        message: readable ? undefined : 'Formato sem extração disponível.',
       };
     }));
     res.json({ documents });
@@ -188,15 +180,15 @@ app.post('/api/files/extract', (req, res, next) => {
 app.use('/api/files/extract', (error, req, res, next) => {
   if (!error) return next();
   const message = error.code === 'LIMIT_FILE_SIZE'
-    ? 'O arquivo é maior que o limite de 50 MB.'
+    ? 'Arquivo maior que 50 MB.'
     : error.code === 'LIMIT_FILE_COUNT'
-      ? 'Você pode enviar no máximo 10 arquivos por vez.'
-      : error.message || 'Não foi possível receber o arquivo.';
+      ? 'Máximo 10 arquivos.'
+      : error.message || 'Erro ao receber arquivo.';
   res.status(400).json({ error: message });
 });
 
 // =============================================
-// 🔥 LOGIN E CADASTRO SIMPLES (SEM EMAIL)
+// LOGIN E CADASTRO SIMPLES (SEM EMAIL)
 // =============================================
 
 function validEmail(email) {
@@ -208,7 +200,6 @@ function issueSession(res, user) {
   res.cookie('oficina_token', token, { httpOnly: true, sameSite: 'lax', maxAge: 30 * 24 * 3600 * 1000 });
 }
 
-// CADASTRO SIMPLES
 app.post('/api/auth/signup', (req, res) => {
   const { email, password, name } = req.body || {};
   const finalEmail = (email || '').trim().toLowerCase();
@@ -236,7 +227,6 @@ app.post('/api/auth/signup', (req, res) => {
   res.json({ user: publicUser(user) });
 });
 
-// LOGIN SIMPLES
 app.post('/api/auth/login', (req, res) => {
   const { email, password } = req.body || {};
   const finalEmail = (email || '').trim().toLowerCase();
@@ -255,15 +245,10 @@ app.post('/api/auth/login', (req, res) => {
   res.json({ user: publicUser(user) });
 });
 
-// LOGOUT
 app.post('/api/auth/logout', (req, res) => {
   res.clearCookie('oficina_token');
   res.json({ ok: true });
 });
-
-// =============================================
-// FIM DO LOGIN SIMPLES
-// =============================================
 
 app.get('/api/me', requireAuth, (req, res) => {
   const user = getUserById(req.userId);
@@ -309,7 +294,7 @@ app.post('/api/billing/checkout', requireAuth, async (req, res) => {
       checkoutUrl: paymentLink.url,
     });
   } catch (error) {
-    console.error('Erro ao criar checkout Asaas:', error.message);
+    console.error('Erro ao criar checkout:', error.message);
     res.status(502).json({ error: error.message || 'Não foi possível iniciar o pagamento.' });
   }
 });
@@ -330,8 +315,6 @@ app.post('/api/billing/asaas/webhook', (req, res) => {
   res.status(202).json({ received: true });
 });
 
-// ---------- Geração com etapas em tempo real (Server-Sent Events) ----------
-
 app.get('/generate/stream', requireAuth, async (req, res) => {
   const prompt = req.query.prompt;
   if (!prompt) {
@@ -342,7 +325,7 @@ app.get('/generate/stream', requireAuth, async (req, res) => {
   const user = getUserById(req.userId);
   const freeLimitReached = !!user && !user.unlimited_credits && user.credits <= 0;
   if (freeLimitReached) {
-    res.status(402).json({ error: 'Limite de créditos do plano grátis atingido. Convide um amigo para ganhar mais 20 créditos.' });
+    res.status(402).json({ error: 'Limite de créditos do plano grátis atingido.' });
     return;
   }
 
@@ -378,7 +361,7 @@ app.post('/generate', requireAuth, async (req, res) => {
 
     const user = getUserById(req.userId);
     if (user && !user.unlimited_credits && user.credits <= 0) {
-      return res.status(402).json({ error: 'Limite de créditos do plano grátis atingido. Convide um amigo para ganhar mais 20 créditos.' });
+      return res.status(402).json({ error: 'Limite de créditos do plano grátis atingido.' });
     }
 
     if (user && !user.unlimited_credits) {
@@ -395,7 +378,7 @@ app.post('/generate', requireAuth, async (req, res) => {
 
 app.post('/refine', requireAuth, async (req, res) => {
   const { html, pedido } = req.body || {};
-  if (!html || !pedido) return res.status(400).json({ error: 'Aplicativo e pedido de alteração são obrigatórios' });
+  if (!html || !pedido) return res.status(400).json({ error: 'Aplicativo e pedido são obrigatórios' });
   try {
     const codigo = await refinarComGemini(html, pedido);
     res.json({ code: codigo });
@@ -405,11 +388,9 @@ app.post('/refine', requireAuth, async (req, res) => {
   }
 });
 
-// ---------- Salvar app gerado na plataforma ----------
-
 app.post('/api/projects/save', requireAuth, (req, res) => {
   const { prompt, plano, html, nome } = req.body || {};
-  if (!html || !prompt) return res.status(400).json({ error: 'Dados incompletos para salvar' });
+  if (!html || !prompt) return res.status(400).json({ error: 'Dados incompletos' });
 
   const project = saveProject({ userId: req.userId, prompt, plano, html, nome });
   res.json({ project: { id: project.id, nome: project.nome, created_at: project.created_at } });
