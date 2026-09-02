@@ -63,10 +63,20 @@ function saveAuthVerification(email, code) {
   }
 }
 
+function deleteAuthVerification(email) {
+  const db = readDb();
+  const user = db.users.find(u => u.email.toLowerCase() === email.toLowerCase());
+  if (user) {
+    user.verification_code = null;
+    writeDb(db);
+  }
+}
+
 module.exports = {
   getUserById,
   getUserByEmail,
   createUser,
   updateUserVerification,
-  saveAuthVerification
+  saveAuthVerification,
+  deleteAuthVerification
 };
