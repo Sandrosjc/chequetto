@@ -212,7 +212,12 @@ document.addEventListener('DOMContentLoaded', () => {
       renderCarousel();
     }, 4200);
   }
-  carouselCta?.addEventListener('click', () => window.chequettoAuth?.openLogin());
+  
+  // 🔥 REMOVIDO: carouselCta não pede mais login
+  carouselCta?.addEventListener('click', () => {
+    el.prompt?.focus();
+  });
+  
   if (rotatingKeyword) {
     setInterval(() => {
       rotatingKeywordIndex = (rotatingKeywordIndex + 1) % rotatingKeywords.length;
@@ -220,46 +225,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }, 2600);
   }
 
-  let loginPromptGuard = false;
-  let authRequestedForPrompt = false;
-
-  window.addEventListener('chequetto:authenticated', (event) => {
-    activeUserId = event.detail?.user?.id || null;
-    clearWorkspace();
-    restoreWorkspace();
-    authRequestedForPrompt = false;
-    loginPromptGuard = false;
-    el.prompt?.focus();
-  });
-
-  window.addEventListener('chequetto:logged-out', () => {
-    activeUserId = null;
-    clearWorkspace();
-  });
-
-  function requireLoadedAuth() {
-    const auth = window.chequettoAuth;
-    if (!auth) return Promise.resolve(false);
-    if (!auth.isLoading?.()) return Promise.resolve(auth.isAuthenticated());
-    return auth.whenReady().then(() => auth.isAuthenticated());
-  }
-
-  el.prompt?.addEventListener('focus', () => {
-    if (!loginPromptGuard && window.chequettoAuth?.isLoading?.()) {
-      el.prompt.blur();
-      return;
-    }
-    if (!window.chequettoAuth?.isAuthenticated() && !loginPromptGuard) {
-      if (authRequestedForPrompt) return;
-      authRequestedForPrompt = true;
-      loginPromptGuard = true;
-      window.chequettoAuth?.openLogin();
-      el.prompt?.blur();
-      setTimeout(() => {
-        loginPromptGuard = false;
-      }, 500);
-    }
-  });
+  // =============================================
+  // 🔥 REMOVIDAS TODAS AS VERIFICAÇÕES DE LOGIN
+  // =============================================
 
   el.prompt?.addEventListener('input', () => {
     state.promptDraft = el.prompt.value;
@@ -284,12 +252,8 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // 🔥 REMOVIDA VERIFICAÇÃO DE LOGIN NAS DICAS
   document.getElementById('aiTips')?.addEventListener('click', (event) => {
-    if (window.chequettoAuth?.isLoading?.()) return;
-    if (!window.chequettoAuth?.isAuthenticated()) {
-      window.chequettoAuth?.openLogin();
-      return;
-    }
     const tip = event.target.closest('[data-tip]')?.getAttribute('data-tip');
     if (!tip || !el.prompt) return;
     el.prompt.value = el.prompt.value.trim()
@@ -298,12 +262,8 @@ document.addEventListener('DOMContentLoaded', () => {
     el.prompt.focus();
   });
 
+  // 🔥 REMOVIDA VERIFICAÇÃO DE LOGIN NO UPLOAD
   el.fileAttach?.addEventListener('change', () => {
-    if (!window.chequettoAuth?.isAuthenticated()) {
-      window.chequettoAuth?.openLogin();
-      el.fileAttach.value = '';
-      return;
-    }
     addAttachedFiles(el.fileAttach.files);
     el.fileAttach.value = '';
   });
@@ -323,7 +283,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // ===================== MICROFONE (falar em vez de digitar) =====================
+  // ===================== MICROFONE =====================
   (function setupMic() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
@@ -360,11 +320,8 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     if (el.btnMic) {
+      // 🔥 REMOVIDA VERIFICAÇÃO DE LOGIN NO MICROFONE
       el.btnMic.addEventListener('click', () => {
-        if (!window.chequettoAuth?.isAuthenticated()) {
-          window.chequettoAuth?.openLogin();
-          return;
-        }
         if (gravando) {
           recognition.stop();
           return;
@@ -416,20 +373,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }).join('\n\n');
   }
 
+  // =============================================
+  // 🔥 BOTÃO GERAR - SEM VERIFICAÇÃO DE LOGIN!
+  // =============================================
   if (el.btnGerar) {
     el.btnGerar.addEventListener('click', async () => {
-      if (!(await requireLoadedAuth())) {
-        authRequestedForPrompt = true;
-        window.chequettoAuth?.openLogin();
-        if (el.status) el.status.textContent = 'Entre ou crie sua conta para gerar o aplicativo.';
-        return;
-      }
-      if (!window.chequettoAuth?.isAuthenticated()) {
-        authRequestedForPrompt = true;
-        window.chequettoAuth?.openLogin();
-        if (el.status) el.status.textContent = 'Entre ou crie sua conta para gerar o aplicativo.';
-        return;
-      }
       const basePrompt = el.prompt ? el.prompt.value.trim() : '';
       if (!basePrompt && !state.attachedFiles.length) {
         alert('Por favor, descreva o aplicativo que você quer criar.');
@@ -475,10 +423,6 @@ document.addEventListener('DOMContentLoaded', () => {
           state.historico.push({ prompt: promptText, code: data.html, plano: state.planoAtual });
           renderHistory();
           persistWorkspace();
-
-          if (window.chequettoAuth?.refresh) {
-            window.chequettoAuth.refresh();
-          }
 
           if (el.status) el.status.textContent = 'Aplicativo gerado com sucesso!';
           setLoading(false);
@@ -530,6 +474,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // =============================================
+  // 🔥 CARREGAR PROJETOS - SEM VERIFICAÇÃO DE LOGIN
+  // =============================================
   async function carregarProjetosSalvos() {
     if (!el.btnMeusProjetos) return;
     const original = el.btnMeusProjetos.innerHTML;
@@ -537,10 +484,6 @@ document.addEventListener('DOMContentLoaded', () => {
     el.btnMeusProjetos.innerHTML = '<span>...</span> Carregando projetos';
     try {
       const res = await fetch('/api/projects');
-      if (res.status === 401) {
-        if (el.status) el.status.textContent = 'Entre na sua conta para acessar seus projetos salvos.';
-        return;
-      }
       const data = await res.json();
       const projetos = data.projects || [];
       if (!projetos.length) {
@@ -567,6 +510,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   el.btnMeusProjetos?.addEventListener('click', carregarProjetosSalvos);
 
+  // =============================================
+  // 🔥 REFINAR - SEM VERIFICAÇÃO DE LOGIN
+  // =============================================
   el.btnRefinar?.addEventListener('click', async () => {
     const pedido = el.refineInput?.value.trim();
     if (!pedido) return;
@@ -624,6 +570,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  // =============================================
+  // 🔥 SALVAR PROJETO - SEM VERIFICAÇÃO DE LOGIN
+  // =============================================
   if (el.btnSalvar) {
     el.btnSalvar.addEventListener('click', async () => {
       if (!state.codigoAtual) return;
@@ -637,7 +586,6 @@ document.addEventListener('DOMContentLoaded', () => {
           body: JSON.stringify({ prompt: state.promptAtual, plano: state.planoAtual, html: state.codigoAtual }),
         });
         const data = await res.json();
-        if (res.status === 401) throw new Error('Não autenticado');
         if (!res.ok) throw new Error(data.error || 'Falha ao salvar');
         const savedProject = {
           id: data.project?.id,
@@ -654,9 +602,6 @@ document.addEventListener('DOMContentLoaded', () => {
         el.btnSalvar.textContent = 'Salvo ✓';
         setTimeout(() => { el.btnSalvar.textContent = original; el.btnSalvar.disabled = false; }, 1800);
       } catch (error) {
-        if (error.message === 'Não autenticado') {
-          window.chequettoAuth?.openLogin();
-        }
         el.btnSalvar.textContent = 'Erro ao salvar';
         setTimeout(() => { el.btnSalvar.textContent = original; el.btnSalvar.disabled = false; }, 1800);
       }
@@ -665,7 +610,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const btnShareWhatsapp = document.getElementById('btnShareWhatsapp');
   btnShareWhatsapp?.addEventListener('click', () => {
-    const link = window.chequettoAuth?.getReferralLink?.() || window.location.origin;
+    const link = window.location.origin;
     const text = encodeURIComponent(`Crie seu aplicativo grátis no Chequetto: ${link}`);
     const url = `https://wa.me/?text=${text}`;
     window.open(url, '_blank', 'noopener,noreferrer');
