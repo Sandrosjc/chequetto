@@ -32,6 +32,53 @@ const upload = multer({
   limits: { files: 10, fileSize: 50 * 1024 * 1024 },
 });
 
+// =============================================
+// CRIAR TABELAS AUTOMATICAMENTE AO INICIAR
+// =============================================
+const Database = require('better-sqlite3');
+const db = new Database('database.db');
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    email TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    name TEXT,
+    referral_code TEXT UNIQUE,
+    referred_by INTEGER,
+    signup_ip TEXT,
+    credits INTEGER DEFAULT 20,
+    unlimited_credits INTEGER DEFAULT 0,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
+
+  CREATE TABLE IF NOT EXISTS projects (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    prompt TEXT,
+    plano TEXT,
+    html TEXT,
+    nome TEXT,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS subscriptions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    plan_id TEXT NOT NULL,
+    amount REAL NOT NULL,
+    currency TEXT DEFAULT 'BRL',
+    gateway TEXT NOT NULL,
+    gateway_checkout_id TEXT,
+    status TEXT DEFAULT 'pending',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  );
+`);
+
+console.log('✅ Banco de dados verificado/criado!');
+
 const keys = getApiKeys();
 const ASAAS_API_URL = process.env.ASAAS_API_URL || 'https://api.asaas.com/v3';
 
@@ -152,9 +199,18 @@ app.use('/api/files/extract', (error, req, res, next) => {
 // 🔥 LOGIN E CADASTRO SIMPLES (SEM EMAIL)
 // =============================================
 
+function validEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
+}
+
+function issueSession(res, user) {
+  const token = signUserToken(user);
+  res.cookie('oficina_token', token, { httpOnly: true, sameSite: 'lax', maxAge: 30 * 24 * 3600 * 1000 });
+}
+
 // CADASTRO SIMPLES
 app.post('/api/auth/signup', (req, res) => {
-  const { email, password, name, referralCode } = req.body || {};
+  const { email, password, name } = req.body || {};
   const finalEmail = (email || '').trim().toLowerCase();
 
   if (!validEmail(finalEmail)) {
@@ -173,13 +229,8 @@ app.post('/api/auth/signup', (req, res) => {
     email: finalEmail,
     name: name || '',
     password: hashPassword(password),
-    referralCode: referralCode || null,
     signupIp: clientIp(req),
   });
-
-  if (user.referred_by) {
-    applyInviteBonusIfNeeded(user.id);
-  }
 
   issueSession(res, user);
   res.json({ user: publicUser(user) });
@@ -209,16 +260,6 @@ app.post('/api/auth/logout', (req, res) => {
   res.clearCookie('oficina_token');
   res.json({ ok: true });
 });
-
-// FUNÇÕES AUXILIARES
-function validEmail(email) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
-}
-
-function issueSession(res, user) {
-  const token = signUserToken(user);
-  res.cookie('oficina_token', token, { httpOnly: true, sameSite: 'lax', maxAge: 30 * 24 * 3600 * 1000 });
-}
 
 // =============================================
 // FIM DO LOGIN SIMPLES
