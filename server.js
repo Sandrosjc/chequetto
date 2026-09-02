@@ -21,8 +21,13 @@ const {
   listProjectsByUser,
   createPendingSubscription,
   setUnlimited,
+  saveAuthVerification,
+  getAuthVerification,
+  incrementAuthVerificationAttempts,
+  deleteAuthVerification,
+  markEmailVerified,
 } = require('./db');
-const { hashPassword, comparePassword } = require('./auth');
+const { signUserToken, requireAuth, hashPassword, comparePassword } = require('./auth');
 const plans = require('./plans.json');
 
 const app = express();
@@ -31,47 +36,6 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { files: 10, fileSize: 50 * 1024 * 1024 },
 });
-
-// CRIAR TABELAS AUTOMATICAMENTE
-const Database = require('better-sqlite3');
-const db = new Database('database.db');
-db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    email TEXT UNIQUE NOT NULL,
-    password_hash TEXT NOT NULL,
-    name TEXT,
-    referral_code TEXT UNIQUE,
-    referred_by INTEGER,
-    signup_ip TEXT,
-    credits INTEGER DEFAULT 20,
-    unlimited_credits INTEGER DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-  );
-  CREATE TABLE IF NOT EXISTS projects (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    prompt TEXT,
-    plano TEXT,
-    html TEXT,
-    nome TEXT,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id)
-  );
-  CREATE TABLE IF NOT EXISTS subscriptions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    plan_id TEXT NOT NULL,
-    amount REAL NOT NULL,
-    currency TEXT DEFAULT 'BRL',
-    gateway TEXT NOT NULL,
-    gateway_checkout_id TEXT,
-    status TEXT DEFAULT 'pending',
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id)
-  );
-`);
-console.log('✅ Banco de dados pronto!');
 
 const keys = getApiKeys();
 const ASAAS_API_URL = process.env.ASAAS_API_URL || 'https://api.asaas.com/v3';
@@ -97,7 +61,7 @@ function publicUser(user) {
 }
 
 async function asaasRequest(endpoint, options = {}) {
-  if (!process.env.ASAAS_API_KEY) throw new Error('ASAAS_API_KEY não configurada.');
+  if (!process.env.ASAAS_API_KEY) throw new Error('ASAAS_API_KEY não configurada no servidor.');
   const response = await fetch(`${ASAAS_API_URL}${endpoint}`, {
     ...options,
     headers: {
@@ -110,7 +74,7 @@ async function asaasRequest(endpoint, options = {}) {
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     const detail = data.errors?.map((item) => item.description).join(', ');
-    throw new Error(detail || data.message || `Erro HTTP ${response.status}.`);
+    throw new Error(detail || data.message || `Asaas respondeu com HTTP ${response.status}.`);
   }
   return data;
 }
@@ -119,32 +83,15 @@ function asaasSubscriptionCycle(plan) {
   return { month: 'MONTHLY', quarter: 'QUARTERLY', year: 'ANNUALLY' }[plan.interval];
 }
 
-// =============================================
-// USUÁRIO PADRÃO PARA TODAS AS ROTAS
-// =============================================
-let defaultUser = null;
-
-function getDefaultUser() {
-  if (!defaultUser) {
-    // Cria um usuário padrão se não existir
-    const existing = getUserByEmail('default@system.com');
-    if (existing) {
-      defaultUser = existing;
-    } else {
-      defaultUser = createUser({
-        email: 'default@system.com',
-        name: 'Usuário Padrão',
-        password: hashPassword('default123'),
-        signupIp: 'system',
-      });
-    }
-  }
-  return defaultUser;
+// tenta pegar o usuário logado, sem exigir login (gerar app funciona sem conta também)
+function tryGetUser(req) {
+  const token = req.cookies && req.cookies.oficina_token;
+  if (!token) return null;
+  const { verifyToken } = require('./auth');
+  const payload = verifyToken(token);
+  if (!payload) return null;
+  return getUserById(payload.uid);
 }
-
-// =============================================
-// ROTAS PÚBLICAS (SEM LOGIN)
-// =============================================
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', keysLoaded: keys.length });
@@ -165,6 +112,7 @@ app.post('/api/files/extract', (req, res, next) => {
       const extension = path.extname(file.originalname).toLowerCase();
       let text = '';
       let readable = true;
+
       if (extension === '.pdf' || file.mimetype === 'application/pdf') {
         text = (await pdfParse(file.buffer)).text;
       } else if (extension === '.docx') {
@@ -182,11 +130,12 @@ app.post('/api/files/extract', (req, res, next) => {
         if (!binary) text = file.buffer.toString('utf8');
         else readable = false;
       }
+
       return {
         name: file.originalname,
         readable,
         text: text.trim().slice(0, 50000),
-        message: readable ? undefined : 'Formato sem extração disponível.',
+        message: readable ? undefined : 'Formato anexado sem extração de texto disponível.',
       };
     }));
     res.json({ documents });
@@ -198,19 +147,149 @@ app.post('/api/files/extract', (req, res, next) => {
 app.use('/api/files/extract', (error, req, res, next) => {
   if (!error) return next();
   const message = error.code === 'LIMIT_FILE_SIZE'
-    ? 'Arquivo maior que 50 MB.'
+    ? 'O arquivo é maior que o limite de 50 MB.'
     : error.code === 'LIMIT_FILE_COUNT'
-      ? 'Máximo 10 arquivos.'
-      : error.message || 'Erro ao receber arquivo.';
+      ? 'Você pode enviar no máximo 10 arquivos por vez.'
+      : error.message || 'Não foi possível receber o arquivo.';
   res.status(400).json({ error: message });
 });
 
-// =============================================
-// ROTAS DE PAGAMENTO (COM USUÁRIO PADRÃO)
-// =============================================
+// ---------- Auth ----------
 
-app.post('/api/billing/checkout', async (req, res) => {
-  const user = getDefaultUser();
+function normalizeEmail(email) {
+  return (email || '').trim().toLowerCase();
+}
+
+function validEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
+}
+
+function hashVerificationCode(code) {
+  return crypto.createHash('sha256').update(code).digest('hex');
+}
+
+async function sendVerificationCode(email, code) {
+  if (!process.env.RESEND_API_KEY || !process.env.AUTH_FROM_EMAIL) {
+    throw new Error('O envio de códigos não está configurado no servidor.');
+  }
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      authorization: `Bearer ${process.env.RESEND_API_KEY}`,
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      from: process.env.AUTH_FROM_EMAIL,
+      to: [email],
+      subject: 'Seu código de verificação Chequetto',
+      text: `Seu código de verificação é ${code}. Ele expira em 10 minutos.`,
+    }),
+  });
+  if (!response.ok) throw new Error('Não foi possível enviar o código de verificação.');
+}
+
+async function issueVerificationCode(email, purpose, payload) {
+  const code = String(crypto.randomInt(100000, 1000000));
+  saveAuthVerification({
+    email,
+    purpose,
+    codeHash: hashVerificationCode(code),
+    payload,
+    expiresAt: Date.now() + 10 * 60 * 1000,
+  });
+  try {
+    await sendVerificationCode(email, code);
+  } catch (error) {
+    deleteAuthVerification(email, purpose);
+    throw error;
+  }
+}
+
+function verificationMatches(record, code) {
+  if (!record || record.expires_at < Date.now() || record.attempts >= 5) return false;
+  const expected = Buffer.from(record.code_hash, 'hex');
+  const received = Buffer.from(hashVerificationCode(String(code || '')), 'hex');
+  return expected.length === received.length && crypto.timingSafeEqual(expected, received);
+}
+
+function issueSession(res, user) {
+  const token = signUserToken(user);
+  res.cookie('oficina_token', token, { httpOnly: true, sameSite: 'lax', maxAge: 30 * 24 * 3600 * 1000 });
+}
+
+app.post('/api/auth/signup/request-code', async (req, res) => {
+  const { email, password, name, referralCode } = req.body || {};
+  const finalEmail = normalizeEmail(email);
+  if (!validEmail(finalEmail) || !password) return res.status(400).json({ error: 'Informe um e-mail válido e uma senha.' });
+  if (password.length < 6) return res.status(400).json({ error: 'A senha precisa ter pelo menos 6 caracteres.' });
+  if (getUserByEmail(finalEmail)) return res.status(409).json({ error: 'Este e-mail já está cadastrado.' });
+  try {
+    await issueVerificationCode(finalEmail, 'signup', {
+      name, passwordHash: hashPassword(password), referralCode, signupIp: clientIp(req),
+    });
+    res.json({ message: 'Código de verificação enviado para seu e-mail.' });
+  } catch (error) {
+    res.status(503).json({ error: error.message });
+  }
+});
+
+app.post('/api/auth/signup/verify', (req, res) => {
+  const finalEmail = normalizeEmail(req.body?.email);
+  const record = getAuthVerification(finalEmail, 'signup');
+  if (!verificationMatches(record, req.body?.code)) {
+    if (record) incrementAuthVerificationAttempts(finalEmail, 'signup');
+    return res.status(401).json({ error: 'Código inválido ou expirado.' });
+  }
+  const payload = JSON.parse(record.payload || '{}');
+  if (getUserByEmail(finalEmail)) return res.status(409).json({ error: 'Este e-mail já está cadastrado.' });
+  const user = createUser({ email: finalEmail, ...payload });
+  markEmailVerified(user.id);
+  deleteAuthVerification(finalEmail, 'signup');
+  if (user.referred_by) applyInviteBonusIfNeeded(user.id);
+  issueSession(res, user);
+  res.json({ user: publicUser(getUserByEmail(finalEmail)) });
+});
+
+app.post('/api/auth/login/request-code', async (req, res) => {
+  const { email, password } = req.body || {};
+  const finalEmail = normalizeEmail(email);
+  if (!validEmail(finalEmail) || !password) return res.status(400).json({ error: 'Informe e-mail e senha.' });
+  const user = getUserByEmail(finalEmail);
+  if (!user || !user.password_hash || !comparePassword(password, user.password_hash)) return res.status(401).json({ error: 'E-mail ou senha inválidos.' });
+  try {
+    await issueVerificationCode(finalEmail, 'login', null);
+    res.json({ message: 'Código de verificação enviado para seu e-mail.' });
+  } catch (error) {
+    res.status(503).json({ error: error.message });
+  }
+});
+
+app.post('/api/auth/login/verify', (req, res) => {
+  const finalEmail = normalizeEmail(req.body?.email);
+  const record = getAuthVerification(finalEmail, 'login');
+  if (!verificationMatches(record, req.body?.code)) {
+    if (record) incrementAuthVerificationAttempts(finalEmail, 'login');
+    return res.status(401).json({ error: 'Código inválido ou expirado.' });
+  }
+  const user = getUserByEmail(finalEmail);
+  if (!user) return res.status(401).json({ error: 'A conta não existe.' });
+  markEmailVerified(user.id);
+  deleteAuthVerification(finalEmail, 'login');
+  issueSession(res, user);
+  return res.json({ user: publicUser(getUserByEmail(finalEmail)) });
+});
+
+app.post('/api/auth/logout', (req, res) => {
+  res.clearCookie('oficina_token');
+  res.json({ ok: true });
+});
+
+app.get('/api/me', requireAuth, (req, res) => {
+  const user = getUserById(req.userId);
+  res.json({ user: publicUser(user), nextTier: invitesRequiredForNextTier(user) });
+});
+
+app.post('/api/billing/checkout', requireAuth, async (req, res) => {
   const { planId } = req.body || {};
   const plan = plans[planId];
   if (!plan || planId === 'gratis') {
@@ -218,6 +297,7 @@ app.post('/api/billing/checkout', async (req, res) => {
   }
 
   try {
+    const user = getUserById(req.userId);
     const isRecurring = plan.type !== 'unico';
     const paymentLink = await asaasRequest('/paymentLinks', {
       method: 'POST',
@@ -234,7 +314,7 @@ app.post('/api/billing/checkout', async (req, res) => {
     });
     if (!paymentLink.url) throw new Error('O Asaas não retornou o link de pagamento.');
     const subscription = createPendingSubscription({
-      userId: user.id,
+      userId: req.userId,
       planId,
       amount: plan.amount,
       currency: plan.currency,
@@ -248,7 +328,7 @@ app.post('/api/billing/checkout', async (req, res) => {
       checkoutUrl: paymentLink.url,
     });
   } catch (error) {
-    console.error('Erro ao criar checkout:', error.message);
+    console.error('Erro ao criar checkout Asaas:', error.message);
     res.status(502).json({ error: error.message || 'Não foi possível iniciar o pagamento.' });
   }
 });
@@ -269,18 +349,21 @@ app.post('/api/billing/asaas/webhook', (req, res) => {
   res.status(202).json({ received: true });
 });
 
-// =============================================
-// ROTAS DE GERAÇÃO (SEM LOGIN)
-// =============================================
+// ---------- Geração com etapas em tempo real (Server-Sent Events) ----------
 
-app.get('/generate/stream', async (req, res) => {
+app.get('/generate/stream', requireAuth, async (req, res) => {
   const prompt = req.query.prompt;
   if (!prompt) {
     res.status(400).json({ error: 'Prompt não fornecido' });
     return;
   }
 
-  const user = getDefaultUser();
+  const user = getUserById(req.userId);
+  const freeLimitReached = !!user && !user.unlimited_credits && user.credits <= 0;
+  if (freeLimitReached) {
+    res.status(402).json({ error: 'Limite de créditos do plano grátis atingido. Convide um amigo para ganhar mais 20 créditos.' });
+    return;
+  }
 
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
@@ -290,6 +373,11 @@ app.get('/generate/stream', async (req, res) => {
   const send = (data) => res.write(`data: ${JSON.stringify(data)}\n\n`);
 
   try {
+    if (user && !user.unlimited_credits) {
+      const updatedUser = require('./db').deductCredit(user.id);
+      if (!updatedUser) throw new Error('Não foi possível atualizar os créditos.');
+    }
+
     const { html, plano } = await gerarComGemini(prompt, [], (step) => send(step), req.query.lang);
     send({ stage: 'salvo_temp', html, plano });
   } catch (error) {
@@ -300,11 +388,21 @@ app.get('/generate/stream', async (req, res) => {
   }
 });
 
-app.post('/generate', async (req, res) => {
+// mantém a rota antiga funcionando também, sem streaming, pra compatibilidade
+app.post('/generate', requireAuth, async (req, res) => {
   try {
     const { prompt } = req.body;
     if (!prompt) {
       return res.status(400).json({ error: 'Prompt não fornecido' });
+    }
+
+    const user = getUserById(req.userId);
+    if (user && !user.unlimited_credits && user.credits <= 0) {
+      return res.status(402).json({ error: 'Limite de créditos do plano grátis atingido. Convide um amigo para ganhar mais 20 créditos.' });
+    }
+
+    if (user && !user.unlimited_credits) {
+      require('./db').deductCredit(user.id);
     }
 
     const { html, plano } = await gerarComGemini(prompt, [], () => {});
@@ -315,7 +413,7 @@ app.post('/generate', async (req, res) => {
   }
 });
 
-app.post('/refine', async (req, res) => {
+app.post('/refine', requireAuth, async (req, res) => {
   const { html, pedido } = req.body || {};
   if (!html || !pedido) return res.status(400).json({ error: 'Aplicativo e pedido de alteração são obrigatórios' });
   try {
@@ -327,28 +425,23 @@ app.post('/refine', async (req, res) => {
   }
 });
 
-// =============================================
-// ROTAS DE PROJETOS (SEM LOGIN)
-// =============================================
+// ---------- Salvar app gerado na plataforma ----------
 
-app.post('/api/projects/save', async (req, res) => {
+app.post('/api/projects/save', requireAuth, (req, res) => {
   const { prompt, plano, html, nome } = req.body || {};
   if (!html || !prompt) return res.status(400).json({ error: 'Dados incompletos para salvar' });
 
-  const user = getDefaultUser();
-
-  const project = saveProject({ userId: user.id, prompt, plano, html, nome });
+  const project = saveProject({ userId: req.userId, prompt, plano, html, nome });
   res.json({ project: { id: project.id, nome: project.nome, created_at: project.created_at } });
 });
 
-app.get('/api/projects', async (req, res) => {
-  const user = getDefaultUser();
-  res.json({ projects: listProjectsByUser(user.id) });
+app.get('/api/projects', requireAuth, (req, res) => {
+  res.json({ projects: listProjectsByUser(req.userId) });
 });
 
-app.get('/api/projects/:id', async (req, res) => {
+app.get('/api/projects/:id', requireAuth, (req, res) => {
   const project = getProjectById(req.params.id);
-  if (!project) return res.status(404).json({ error: 'Não encontrado' });
+  if (!project || project.user_id !== req.userId) return res.status(404).json({ error: 'Não encontrado' });
   project.plano = JSON.parse(project.plano || '[]');
   res.json({ project });
 });
@@ -357,5 +450,4 @@ app.listen(PORT, () => {
   console.log(`🚀 Servidor rodando na porta ${PORT}`);
   console.log(`   Chaves carregadas: ${keys.length}`);
   console.log(`Servidor rodando com sucesso!`);
-  console.log(`✅ SEM LOGIN - Todos podem usar!`);
 });
