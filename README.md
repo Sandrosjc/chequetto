@@ -30,31 +30,6 @@ para a próxima).
   dali.
 - **Histórico da sessão** — clique em qualquer geração anterior para
   voltar a ela.
-- **Persistência de projetos (Parte 1)** — cada projeto pertence ao usuário,
-  usa `name`, `files` (JSONB compatível com SQLite), `created_at` e
-  `updated_at`; gerações da IA, refinamentos e edição direta do código são
-  salvos automaticamente e podem ser carregados pela API.
-- **Dashboard de projetos (Parte 2)** — visualize os projetos em cards,
-  abra, renomeie ou exclua cada projeto e crie um novo projeto sem perder o
-  fluxo do editor.
-- **Editor e GitHub (Parte 3)** — edição direta com salvamento automático,
-  ditado por voz, importação de repositórios públicos e envio de arquivos
-  para um repositório GitHub por commit. Também permite abrir uma pasta local,
-  preservar os caminhos dos arquivos e baixar o projeto inteiro em ZIP.
-- **Painel de extensões** — catálogo local no estilo VS Code para instalar,
-  ativar e desativar extensões do workspace. Manifestos JSON próprios podem
-  ser adicionados sem executar código arbitrário no navegador.
-- **Dashboard premium** — visão de workspace com boas-vindas personalizadas,
-  resumo de projetos e arquivos, busca, ordenação, cards refinados e estados
-  vazios pensados para orientar o próximo passo.
-- **Autenticação por e-mail** — cadastro com senha, link de confirmação,
-  login protegido, sessão por cookie e armazenamento seguro da senha com
-  bcrypt. O envio pode usar SMTP ou Resend; em desenvolvimento sem provedor,
-  o link é exibido somente no console do servidor.
-- **Acesso protegido no editor** — ao tentar digitar, colar, anexar arquivo,
-  usar o microfone, gerar ou refinar sem estar conectado, o modal de
-  login/cadastro abre automaticamente. Depois da autenticação, o foco volta
-  para o campo que a pessoa estava usando.
 - **`package.json`, `.gitignore` e este README** — não existiam antes.
 
 ## Passo a passo para rodar hoje
@@ -89,20 +64,7 @@ transcrição ou análise multimodal para serem interpretados.
 ```bash
 npm start
 ```
-Abra **http://localhost:10000** no navegador (ou a porta definida em
-`PORT`).
-
-### 5. Confirmação de e-mail
-
-Para produção, configure um dos dois caminhos:
-
-- SMTP: `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURE`, `SMTP_USER`,
-  `SMTP_PASSWORD` e `AUTH_FROM_EMAIL`;
-- Resend: `RESEND_API_KEY` e `AUTH_FROM_EMAIL`.
-
-O cadastro só libera o login depois que a pessoa abre o link enviado por
-e-mail. Não coloque senhas, tokens ou chaves diretamente no código ou no
-GitHub.
+Abra **http://localhost:3000** no navegador.
 
 ## Como subir para o GitHub sem vazar suas chaves
 
@@ -123,32 +85,6 @@ git push -u origin main
 Depois, em qualquer outro computador (ou para outra pessoa rodar seu
 projeto), o processo é: clonar, `npm install`, criar o próprio `.env` com
 as próprias chaves, `npm start`.
-
-## API de projetos
-
-- `POST /api/projects/save` cria um projeto ou atualiza o projeto enviado em
-  `id`. O corpo aceita `prompt`, `plano`, `html`, `name` e `files`.
-- `PUT /api/projects/:id` atualiza explicitamente um projeto do usuário.
-- `GET /api/projects` lista os projetos do usuário autenticado.
-- `GET /api/projects/:id` carrega um projeto específico, incluindo `files`
-  como lista JSON e `updated_at`.
-- `PATCH /api/projects/:id` renomeia um projeto.
-- `DELETE /api/projects/:id` exclui um projeto pertencente ao usuário.
-- `POST /api/auth/register` cria uma conta e envia o link de confirmação.
-- `GET /api/auth/verify?token=...` confirma o endereço de e-mail.
-- `POST /api/auth/login` entra com e-mail e senha após a confirmação.
-- `GET /api/auth/me` é um alias autenticado para consultar a sessão atual.
-- `POST /api/github/import` importa os arquivos de texto de um repositório
-  público do GitHub para o editor.
-- `POST /api/github/push` cria um commit com os arquivos atuais e atualiza a
-  branch de destino. O token pode ser informado apenas durante a operação ou
-  configurado como Secret `GITHUB_TOKEN`; ele nunca é salvo no banco.
-- `GET /api/projects/:id/download` baixa os arquivos do projeto em ZIP.
-
-Como a versão atual usa SQLite, `files` é armazenado como JSON serializado
-na coluna declarada `JSONB`, com validação e normalização na camada de banco.
-Em uma futura migração para PostgreSQL, a mesma estrutura pode ser movida
-para JSONB nativo sem mudar o contrato da API.
 
 ## Limitações importantes (leia antes de anunciar como "o melhor do mundo")
 

@@ -192,15 +192,9 @@ document.addEventListener('DOMContentLoaded', () => {
   async function fetchMe() {
     const requestVersion = authRequestVersion;
     try {
-      const authParams = new URLSearchParams(window.location.search);
-      const authError = authParams.get('auth_error');
-      const authMessage = authParams.get('auth_message');
+      const authError = new URLSearchParams(window.location.search).get('auth_error');
       if (authError) {
         if (el.loginError) el.loginError.textContent = authError || '';
-        openModal();
-        window.history.replaceState({}, document.title, window.location.pathname);
-      } else if (authMessage) {
-        if (el.authLead) el.authLead.textContent = authMessage;
         openModal();
         window.history.replaceState({}, document.title, window.location.pathname);
       }
@@ -313,21 +307,24 @@ document.addEventListener('DOMContentLoaded', () => {
   el.formLogin?.addEventListener('submit', async (e) => {
     e.preventDefault();
     el.loginError.textContent = '';
+    console.log('[AUTH][LOGIN] captura', { email: el.loginEmail?.value?.trim().toLowerCase(), senhaPreenchida: Boolean(el.loginPassword?.value), tamanhoSenha: el.loginPassword?.value?.length || 0 });
     try {
-      const res = await fetch('/api/auth/login', {
+      console.log('[AUTH][LOGIN] chamada API', { endpoint: '/api/auth/login', credentials: 'same-origin' });
+      const res = await fetch('/api/auth/login/request-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
         body: JSON.stringify({ email: el.loginEmail.value.trim().toLowerCase(), password: el.loginPassword.value }),
       });
       const data = await res.json().catch(() => ({}));
+      console.log('[AUTH][LOGIN] resposta API', { status: res.status, ok: res.ok, dados: data });
       if (!res.ok) throw new Error(data.error || 'Erro ao entrar');
-      authRequestVersion += 1;
-      await fetchMe();
-      if (!currentUser) throw new Error('A sessão não pôde ser confirmada. Tente novamente.');
-      closeModal();
-      continuePendingAction();
+      el.formLogin.hidden = true;
+      el.formLoginVerification.hidden = false;
+      el.loginVerificationCode.focus();
+      el.loginVerificationError.textContent = data.message || '';
     } catch (err) {
+      console.error('[AUTH][LOGIN] erro', { name: err.name, message: err.message, stack: err.stack });
       el.loginError.textContent = err.message;
     }
   });
@@ -363,7 +360,7 @@ document.addEventListener('DOMContentLoaded', () => {
       const referralField = document.getElementById('signupReferralCode');
       if (referralField) referralField.value = referralCode || '';
 
-      const res = await fetch('/api/auth/register', {
+      const res = await fetch('/api/auth/signup/request-code', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'same-origin',
@@ -377,8 +374,9 @@ document.addEventListener('DOMContentLoaded', () => {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || 'Erro ao criar conta');
       el.formSignup.hidden = true;
-      el.formSignupVerification.hidden = true;
-      if (el.authLead) el.authLead.textContent = data.message || 'Cadastro criado. Verifique seu e-mail para ativar a conta.';
+      el.formSignupVerification.hidden = false;
+      el.signupVerificationCode.focus();
+      el.signupVerificationError.textContent = data.message || '';
     } catch (err) {
       el.signupError.textContent = err.message;
     }
@@ -408,10 +406,5 @@ document.addEventListener('DOMContentLoaded', () => {
 
   renderCheckoutSummary();
   startOfferCountdown();
-  const authParams = new URLSearchParams(window.location.search);
-  const authMessage = authParams.get('auth_message');
-  const authError = authParams.get('auth_error');
-  if (authMessage && el.authLead) el.authLead.textContent = authMessage;
-  if (authError && el.loginError) el.loginError.textContent = authError;
   fetchMe();
 });

@@ -29,7 +29,7 @@
       <div id="accountArea"></div>
     </div>
     <div class="workspace-nav" aria-label="Navegação do workspace">
-      <button class="workspace-nav__item is-active" type="button" id="btnCriarApp"><span>✦</span> Criar aplicativo</button>
+      <button class="workspace-nav__item is-active" type="button"><span>✦</span> Criar aplicativo</button>
       <button class="workspace-nav__item" type="button" id="btnMeusProjetos"><span>▦</span> Meus projetos</button>
     </div>
     <div class="bench__eyebrow"><span class="eyebrow__dot"></span> Super Platform 2026 <span class="eyebrow__status">online</span></div>
@@ -42,24 +42,6 @@
       </div>
       <div class="attached-files" id="attachedFiles" hidden></div>
       <p class="field__hint" id="micHint">Cole código, descreva seu app ou anexe arquivos para começar.</p>
-      <div class="github-import">
-        <label class="field__label" for="githubRepoUrl">Importar repositório público</label>
-        <div class="github-import__row">
-          <input id="githubRepoUrl" type="url" placeholder="https://github.com/usuario/repositorio" autocomplete="url">
-          <button class="btn-secondary" id="btnImportGithub" type="button">Importar do GitHub</button>
-        </div>
-        <p class="github-import__status" id="githubImportStatus" aria-live="polite"></p>
-      </div>
-      <div class="workspace-files">
-        <label class="field__label" for="folderAttach">Abrir uma pasta do computador</label>
-        <div class="workspace-files__row">
-          <label class="btn-secondary btn-file-picker" for="folderAttach">📁 Escolher pasta
-            <input id="folderAttach" type="file" webkitdirectory directory multiple hidden>
-          </label>
-          <span class="workspace-files__hint">Mantém a estrutura dos arquivos</span>
-        </div>
-        <p class="github-import__status" id="folderImportStatus" aria-live="polite"></p>
-      </div>
     </div>
     <div class="bench__tips" id="aiTips">
       <p class="examples__title" data-i18n="tips">Dicas da IA</p>
@@ -96,88 +78,6 @@
   </aside>
   <!-- ===================== PALCO / PREVIEW ===================== -->
   <main class="stage">
-    <!-- ===================== DASHBOARD ===================== -->
-    <section class="dashboard-view" id="dashboardView" hidden>
-      <header class="dashboard-header">
-        <div class="dashboard-heading">
-          <span class="dashboard-kicker">WORKSPACE / PROJETOS</span>
-          <h1 id="dashboardGreeting">Seu espaço de criação.</h1>
-          <p>Um lugar calmo para transformar ideias em produtos reais.</p>
-        </div>
-        <div class="dashboard-header__actions">
-          <span class="dashboard-live"><i></i> Workspace protegido</span>
-          <button class="btn-primary dashboard-new" id="btnNovoProjeto" type="button">
-            <span aria-hidden="true">+</span> Novo projeto
-          </button>
-        </div>
-      </header>
-      <section class="dashboard-hero">
-        <div class="dashboard-hero__copy">
-          <span class="dashboard-hero__eyebrow">SEU ESTÚDIO DIGITAL</span>
-          <h2>Crie algo que<br><em>mereça existir.</em></h2>
-          <p>Retome uma ideia, refine um projeto ou comece do zero com a ajuda da IA.</p>
-          <button class="dashboard-hero__link" id="btnDashboardStart" type="button">Começar um projeto <span>↗</span></button>
-        </div>
-        <div class="dashboard-hero__visual" aria-hidden="true">
-          <div class="dashboard-orbit dashboard-orbit--one"></div>
-          <div class="dashboard-orbit dashboard-orbit--two"></div>
-          <div class="dashboard-hero__spark">✦</div>
-          <div class="dashboard-hero__code"><span>01</span><b>idea</b> → <strong>product</strong><small>build / refine / ship</small></div>
-        </div>
-      </section>
-      <section class="dashboard-stats" aria-label="Resumo do workspace">
-        <div class="dashboard-stat dashboard-stat--accent">
-          <span class="dashboard-stat__label">Projetos no workspace</span>
-          <strong id="dashboardStatTotal">0</strong>
-          <small id="dashboardStatTotalHint">Prontos para evoluir</small>
-        </div>
-        <div class="dashboard-stat">
-          <span class="dashboard-stat__label">Última atividade</span>
-          <strong id="dashboardStatUpdated">—</strong>
-          <small>Seu ritmo de criação</small>
-        </div>
-        <div class="dashboard-stat">
-          <span class="dashboard-stat__label">Arquivos criados</span>
-          <strong id="dashboardStatFiles">0</strong>
-          <small>Organizados nos seus projetos</small>
-        </div>
-      </section>
-      <div class="dashboard-toolbar">
-        <div class="dashboard-toolbar__title">
-          <span class="dashboard-toolbar__dot"></span>
-          <span id="dashboardCount">Seus projetos salvos</span>
-        </div>
-        <div class="dashboard-toolbar__controls">
-          <label class="dashboard-search">
-            <span aria-hidden="true">⌕</span>
-            <input id="dashboardSearch" type="search" placeholder="Buscar projetos..." autocomplete="off">
-          </label>
-          <label class="dashboard-sort">
-            <span>Ordenar</span>
-            <select id="dashboardSort" aria-label="Ordenar projetos">
-              <option value="updated">Mais recentes</option>
-              <option value="created">Mais antigos</option>
-              <option value="name">Nome A–Z</option>
-            </select>
-          </label>
-        </div>
-        <span class="dashboard-status" id="dashboardStatus" aria-live="polite"></span>
-      </div>
-      <div class="projects-grid" id="projectsGrid"></div>
-      <div class="dashboard-no-results" id="dashboardNoResults" hidden>
-        <span aria-hidden="true">⌕</span>
-        <h2>Nenhum projeto encontrado</h2>
-        <p>Tente outro termo de busca ou limpe o filtro.</p>
-      </div>
-      <div class="dashboard-empty" id="dashboardEmpty" hidden>
-        <div class="dashboard-empty__icon" aria-hidden="true">✦</div>
-        <h2>Seu próximo projeto começa aqui.</h2>
-        <p>Ainda não há projetos salvos. Descreva uma ideia e transforme-a em um app funcional.</p>
-        <button class="btn-secondary" id="btnNovoProjetoVazio" type="button">Criar primeiro projeto</button>
-      </div>
-    </section>
-
-    <div id="editorView">
     <div class="stage__bar">
       <div class="stage__tabs">
         <button class="tab is-active" data-view="preview" data-i18n="preview">Prévia</button>
@@ -189,24 +89,20 @@
         <button class="device" data-width="375px" title="Celular" data-i18n="mobile">Celular</button>
       </div>
       <div class="stage__actions">
-        <button class="btn-ghost" id="btnBackDashboard" type="button">← Projetos</button>
         <button class="btn-ghost" id="btnShareWhatsapp" type="button">📲 WhatsApp</button>
-        <button class="btn-ghost" id="btnExtensions" type="button">🧩 Extensões</button>
-        <button class="btn-ghost" id="btnGithubPush" type="button">↗ GitHub</button>
         <button class="btn-ghost" id="btnCopiar" disabled data-i18n="copy">Copiar código</button>
         <button class="btn-ghost" id="btnBaixar" disabled data-i18n="download">Baixar .html</button>
-        <button class="btn-ghost" id="btnDownloadProject" disabled type="button">Baixar projeto .zip</button>
         <button class="btn-secondary" id="btnSalvar" disabled data-i18n="save">Salvar na Oficina</button>
       </div>
     </div>
     <div class="stage__context">
-      <div><span class="context__label">ESTÚDIO</span><strong id="editorProjectName">Novo projeto</strong></div>
+      <div><span class="context__label">ESTÚDIO</span><strong>Seu aplicativo, em tempo real</strong></div>
       <span class="context__hint">Descreva. Gere. Refine.</span>
     </div>
     <div class="stage__viewport">
       <div class="frame-wrap" id="frameWrap">
         <iframe id="previewFrame" hidden></iframe>
-        <pre class="code-view" id="codeView" hidden><code id="codeViewText" contenteditable="true" spellcheck="false" role="textbox" aria-label="Código do aplicativo"></code></pre>
+        <pre class="code-view" id="codeView" hidden><code id="codeViewText"></code></pre>
       </div>
       <div class="empty-state" id="emptyState">
         <div class="conversion-carousel" aria-live="polite">
@@ -229,49 +125,7 @@
       <input id="refineInput" type="text" data-i18n-placeholder="refinePlaceholder" placeholder="Peça uma alteração no app gerado..." autocomplete="off">
       <button class="btn-secondary" id="btnRefinar" disabled data-i18n="refine">Aplicar alteração</button>
     </div>
-    </div>
   </main>
-</div>
-
-<!-- ===================== MODAL GITHUB ===================== -->
-<div class="modal-overlay" id="githubPushOverlay" hidden>
-  <div class="github-modal" role="dialog" aria-modal="true" aria-labelledby="githubModalTitle">
-    <button class="auth-modal__close" id="closeGithubModal" type="button" aria-label="Fechar">×</button>
-    <p class="auth-kicker">CHEQUETTO / VERSIONAMENTO</p>
-    <h2 id="githubModalTitle">Enviar para o GitHub</h2>
-    <p class="github-modal__lead">Publique os arquivos atuais em um repositório que você controla.</p>
-    <form id="githubPushForm">
-      <label class="auth-field"><span>Repositório de destino</span><input id="githubPushRepoUrl" type="url" placeholder="https://github.com/usuario/repositorio" required></label>
-      <div class="github-modal__grid">
-        <label class="auth-field"><span>Branch</span><input id="githubPushBranch" type="text" value="main" placeholder="main"></label>
-        <label class="auth-field"><span>Mensagem do commit</span><input id="githubPushMessage" type="text" placeholder="Atualização pelo Chequetto"></label>
-      </div>
-      <label class="auth-field"><span>Personal Access Token <small>(não será salvo)</small></span><input id="githubPushToken" type="password" autocomplete="off" placeholder="ghp_... ou token fine-grained"></label>
-      <p class="github-modal__note">Para não digitar o token novamente, configure <strong>GITHUB_TOKEN</strong> nos Secrets do projeto. Nunca salvamos esse valor no banco.</p>
-      <p class="github-push-status" id="githubPushStatus" aria-live="polite"></p>
-      <button class="btn-primary" id="btnConfirmGithubPush" type="submit">Enviar para o GitHub</button>
-    </form>
-  </div>
-</div>
-
-<!-- ===================== PAINEL DE EXTENSÕES ===================== -->
-<div class="modal-overlay" id="extensionsOverlay" hidden>
-  <div class="extensions-modal" role="dialog" aria-modal="true" aria-labelledby="extensionsTitle">
-    <button class="auth-modal__close" id="closeExtensions" type="button" aria-label="Fechar">×</button>
-    <div class="extensions-modal__header">
-      <div>
-        <p class="auth-kicker">CHEQUETTO / WORKSPACE</p>
-        <h2 id="extensionsTitle">Extensões</h2>
-        <p>Personalize seu ambiente de criação como no Visual Studio Code.</p>
-      </div>
-      <label class="btn-secondary btn-file-picker" for="extensionUpload">＋ Adicionar extensão
-        <input id="extensionUpload" type="file" accept=".json,application/json" hidden>
-      </label>
-    </div>
-    <div class="extensions-grid" id="extensionsGrid"></div>
-    <p class="extensions-status" id="extensionsStatus" aria-live="polite"></p>
-    <p class="extensions-note">Extensões próprias usam apenas um manifesto JSON. O navegador não executa código enviado por terceiros.</p>
-  </div>
 </div>
 
 <!-- ===================== JANELA DE LOGIN / CADASTRO ===================== -->
