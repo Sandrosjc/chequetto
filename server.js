@@ -22,7 +22,7 @@ const {
   createPendingSubscription,
   setUnlimited,
 } = require('./db');
-const { signUserToken, requireAuth, hashPassword, comparePassword } = require('./auth');
+const { signUserToken, hashPassword, comparePassword } = require('./auth');
 const plans = require('./plans.json');
 
 const app = express();
@@ -119,15 +119,6 @@ function asaasSubscriptionCycle(plan) {
   return { month: 'MONTHLY', quarter: 'QUARTERLY', year: 'ANNUALLY' }[plan.interval];
 }
 
-function tryGetUser(req) {
-  const token = req.cookies && req.cookies.oficina_token;
-  if (!token) return null;
-  const { verifyToken } = require('./auth');
-  const payload = verifyToken(token);
-  if (!payload) return null;
-  return getUserById(payload.uid);
-}
-
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', keysLoaded: keys.length });
 });
@@ -188,7 +179,22 @@ app.use('/api/files/extract', (error, req, res, next) => {
 });
 
 // =============================================
-// LOGIN E CADASTRO SIMPLES (SEM EMAIL)
+// FUNÇÃO PARA VERIFICAR TOKEN
+// =============================================
+function getUserIdFromToken(req) {
+  const token = req.cookies && req.cookies.oficina_token;
+  if (!token) return null;
+  try {
+    const { verifyToken } = require('./auth');
+    const payload = verifyToken(token);
+    return payload ? payload.uid : null;
+  } catch {
+    return null;
+  }
+}
+
+// =============================================
+// CADASTRO E LOGIN (MANTIDOS)
 // =============================================
 
 function validEmail(email) {
@@ -250,12 +256,21 @@ app.post('/api/auth/logout', (req, res) => {
   res.json({ ok: true });
 });
 
-app.get('/api/me', requireAuth, (req, res) => {
-  const user = getUserById(req.userId);
+app.get('/api/me', (req, res) => {
+  const userId = getUserIdFromToken(req);
+  if (!userId) return res.status(401).json({ error: 'Não autenticado' });
+  const user = getUserById(userId);
   res.json({ user: publicUser(user), nextTier: invitesRequiredForNextTier(user) });
 });
 
-app.post('/api/billing/checkout', requireAuth, async (req, res) => {
+// =============================================
+// ROTAS DE PAGAMENTO
+// =============================================
+
+app.post('/api/billing/checkout', async (req, res) => {
+  const userId = getUserIdFromToken(req);
+  if (!userId) return res.status(401).json({ error: 'Não autenticado' });
+  
   const { planId } = req.body || {};
   const plan = plans[planId];
   if (!plan || planId === 'gratis') {
@@ -263,7 +278,7 @@ app.post('/api/billing/checkout', requireAuth, async (req, res) => {
   }
 
   try {
-    const user = getUserById(req.userId);
+    const user = getUserById(userId);
     const isRecurring = plan.type !== 'unico';
     const paymentLink = await asaasRequest('/paymentLinks', {
       method: 'POST',
@@ -280,7 +295,7 @@ app.post('/api/billing/checkout', requireAuth, async (req, res) => {
     });
     if (!paymentLink.url) throw new Error('O Asaas não retornou o link de pagamento.');
     const subscription = createPendingSubscription({
-      userId: req.userId,
+      userId: user.id,
       planId,
       amount: plan.amount,
       currency: plan.currency,
@@ -315,18 +330,26 @@ app.post('/api/billing/asaas/webhook', (req, res) => {
   res.status(202).json({ received: true });
 });
 
-app.get('/generate/stream', requireAuth, async (req, res) => {
+// =============================================
+// ROTAS DE GERAÇÃO (SEM LOGIN OBRIGATÓRIO)
+// =============================================
+
+app.get('/generate/stream', async (req, res) => {
   const prompt = req.query.prompt;
   if (!prompt) {
     res.status(400).json({ error: 'Prompt não fornecido' });
     return;
   }
 
-  const user = getUserById(req.userId);
-  const freeLimitReached = !!user && !user.unlimited_credits && user.credits <= 0;
-  if (freeLimitReached) {
-    res.status(402).json({ error: 'Limite de créditos do plano grátis atingido.' });
-    return;
+  const userId = getUserIdFromToken(req);
+  const user = userId ? getUserById(userId) : null;
+
+  if (user) {
+    const freeLimitReached = !user.unlimited_credits && user.credits <= 0;
+    if (freeLimitReached) {
+      res.status(402).json({ error: 'Limite de créditos do plano grátis atingido.' });
+      return;
+    }
   }
 
   res.setHeader('Content-Type', 'text/event-stream');
@@ -352,20 +375,23 @@ app.get('/generate/stream', requireAuth, async (req, res) => {
   }
 });
 
-app.post('/generate', requireAuth, async (req, res) => {
+app.post('/generate', async (req, res) => {
   try {
     const { prompt } = req.body;
     if (!prompt) {
       return res.status(400).json({ error: 'Prompt não fornecido' });
     }
 
-    const user = getUserById(req.userId);
-    if (user && !user.unlimited_credits && user.credits <= 0) {
-      return res.status(402).json({ error: 'Limite de créditos do plano grátis atingido.' });
-    }
+    const userId = getUserIdFromToken(req);
+    const user = userId ? getUserById(userId) : null;
 
-    if (user && !user.unlimited_credits) {
-      require('./db').deductCredit(user.id);
+    if (user) {
+      if (!user.unlimited_credits && user.credits <= 0) {
+        return res.status(402).json({ error: 'Limite de créditos do plano grátis atingido.' });
+      }
+      if (!user.unlimited_credits) {
+        require('./db').deductCredit(user.id);
+      }
     }
 
     const { html, plano } = await gerarComGemini(prompt, [], () => {});
@@ -376,9 +402,9 @@ app.post('/generate', requireAuth, async (req, res) => {
   }
 });
 
-app.post('/refine', requireAuth, async (req, res) => {
+app.post('/refine', async (req, res) => {
   const { html, pedido } = req.body || {};
-  if (!html || !pedido) return res.status(400).json({ error: 'Aplicativo e pedido são obrigatórios' });
+  if (!html || !pedido) return res.status(400).json({ error: 'Aplicativo e pedido de alteração são obrigatórios' });
   try {
     const codigo = await refinarComGemini(html, pedido);
     res.json({ code: codigo });
@@ -388,21 +414,43 @@ app.post('/refine', requireAuth, async (req, res) => {
   }
 });
 
-app.post('/api/projects/save', requireAuth, (req, res) => {
-  const { prompt, plano, html, nome } = req.body || {};
-  if (!html || !prompt) return res.status(400).json({ error: 'Dados incompletos' });
+// =============================================
+// ROTAS DE PROJETOS
+// =============================================
 
-  const project = saveProject({ userId: req.userId, prompt, plano, html, nome });
+app.post('/api/projects/save', async (req, res) => {
+  const { prompt, plano, html, nome } = req.body || {};
+  if (!html || !prompt) return res.status(400).json({ error: 'Dados incompletos para salvar' });
+
+  let userId = getUserIdFromToken(req);
+  
+  if (!userId) {
+    const anonUser = createUser({
+      email: `anon_${Date.now()}@temp.com`,
+      name: 'Anônimo',
+      password: hashPassword(crypto.randomBytes(16).toString('hex')),
+      signupIp: clientIp(req),
+    });
+    userId = anonUser.id;
+    // Cria sessão para o usuário anônimo
+    issueSession(res, anonUser);
+  }
+
+  const project = saveProject({ userId, prompt, plano, html, nome });
   res.json({ project: { id: project.id, nome: project.nome, created_at: project.created_at } });
 });
 
-app.get('/api/projects', requireAuth, (req, res) => {
-  res.json({ projects: listProjectsByUser(req.userId) });
+app.get('/api/projects', async (req, res) => {
+  const userId = getUserIdFromToken(req);
+  if (!userId) return res.json({ projects: [] });
+  res.json({ projects: listProjectsByUser(userId) });
 });
 
-app.get('/api/projects/:id', requireAuth, (req, res) => {
+app.get('/api/projects/:id', async (req, res) => {
+  const userId = getUserIdFromToken(req);
   const project = getProjectById(req.params.id);
-  if (!project || project.user_id !== req.userId) return res.status(404).json({ error: 'Não encontrado' });
+  if (!project) return res.status(404).json({ error: 'Não encontrado' });
+  if (project.user_id !== userId) return res.status(403).json({ error: 'Não autorizado' });
   project.plano = JSON.parse(project.plano || '[]');
   res.json({ project });
 });
