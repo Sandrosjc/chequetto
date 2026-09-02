@@ -1,4 +1,3 @@
-// db.js — banco de dados local simulado
 const fs = require('fs');
 const path = require('path');
 
@@ -55,9 +54,19 @@ function updateUserVerification(userId) {
   }
 }
 
+function saveAuthVerification(email, code) {
+  const db = readDb();
+  const user = db.users.find(u => u.email.toLowerCase() === email.toLowerCase());
+  if (user) {
+    user.verification_code = code;
+    writeDb(db);
+  }
+}
+
 module.exports = {
   getUserById,
   getUserByEmail,
   createUser,
-  updateUserVerification
+  updateUserVerification,
+  saveAuthVerification
 };
