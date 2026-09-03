@@ -8,6 +8,7 @@ const XLSX = require('xlsx');
 const dotenv = require('dotenv');
 dotenv.config();
 const cookieParser = require('cookie-parser');
+const { createClient } = require('@supabase/supabase-js');
 const { gerarComGemini, refinarComGemini, getApiKeys } = require('./gemini-manager');
 const {
   createUser,
@@ -32,7 +33,15 @@ const upload = multer({
   limits: { files: 10, fileSize: 50 * 1024 * 1024 },
 });
 
-// CRIAR TABELAS AUTOMATICAMENTE
+// =============================================
+// 🔥 SUPABASE
+// =============================================
+const supabaseUrl = process.env.SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_PUBLISHABLE_KEY;
+const supabase = createClient(supabaseUrl, supabaseKey);
+console.log('✅ Supabase conectado!');
+
+// CRIAR TABELAS AUTOMATICAMENTE (SQLite local)
 const Database = require('better-sqlite3');
 const db = new Database('database.db');
 db.exec(`
@@ -71,7 +80,7 @@ db.exec(`
     FOREIGN KEY (user_id) REFERENCES users(id)
   );
 `);
-console.log('✅ Banco de dados pronto!');
+console.log('✅ Banco SQLite pronto!');
 
 const keys = getApiKeys();
 const ASAAS_API_URL = process.env.ASAAS_API_URL || 'https://api.asaas.com/v3';
@@ -263,29 +272,78 @@ app.post('/refine', async (req, res) => {
 });
 
 // =============================================
-// ROTAS DE PROJETOS (SEM LOGIN)
+// ROTAS DE PROJETOS (SALVA NO SUPABASE)
 // =============================================
 
 app.post('/api/projects/save', async (req, res) => {
   const { prompt, plano, html, nome } = req.body || {};
   if (!html || !prompt) return res.status(400).json({ error: 'Dados incompletos para salvar' });
 
-  const user = getDefaultUser();
+  try {
+    // 🔥 SALVA NO SUPABASE
+    const { data, error } = await supabase
+      .from('gerador_de_app')
+      .insert([
+        {
+          user_email: 'default@system.com',
+          prompt: prompt,
+          html: html,
+          nome: nome || 'App sem nome',
+          plano: plano || []
+        }
+      ]);
 
-  const project = saveProject({ userId: user.id, prompt, plano, html, nome });
-  res.json({ project: { id: project.id, nome: project.nome, created_at: project.created_at } });
+    if (error) {
+      console.error('Erro ao salvar no Supabase:', error);
+      throw new Error(error.message);
+    }
+
+    console.log('✅ Projeto salvo no Supabase:', data);
+    res.json({ project: { id: data?.[0]?.id, nome: nome || 'App sem nome' } });
+  } catch (error) {
+    console.error('Erro ao salvar projeto:', error);
+    res.status(500).json({ error: error.message || 'Falha ao salvar projeto' });
+  }
 });
 
 app.get('/api/projects', async (req, res) => {
-  const user = getDefaultUser();
-  res.json({ projects: listProjectsByUser(user.id) });
+  try {
+    // 🔥 BUSCA DO SUPABASE
+    const { data, error } = await supabase
+      .from('gerador_de_app')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Erro ao buscar projetos:', error);
+      throw new Error(error.message);
+    }
+
+    res.json({ projects: data || [] });
+  } catch (error) {
+    console.error('Erro ao buscar projetos:', error);
+    res.status(500).json({ error: error.message || 'Falha ao buscar projetos' });
+  }
 });
 
 app.get('/api/projects/:id', async (req, res) => {
-  const project = getProjectById(req.params.id);
-  if (!project) return res.status(404).json({ error: 'Não encontrado' });
-  project.plano = JSON.parse(project.plano || '[]');
-  res.json({ project });
+  try {
+    const { data, error } = await supabase
+      .from('gerador_de_app')
+      .select('*')
+      .eq('id', req.params.id)
+      .single();
+
+    if (error) {
+      console.error('Erro ao buscar projeto:', error);
+      return res.status(404).json({ error: 'Projeto não encontrado' });
+    }
+
+    res.json({ project: data });
+  } catch (error) {
+    console.error('Erro ao buscar projeto:', error);
+    res.status(500).json({ error: error.message || 'Falha ao buscar projeto' });
+  }
 });
 
 // =============================================
@@ -357,4 +415,5 @@ app.listen(PORT, () => {
   console.log(`   Chaves carregadas: ${keys.length}`);
   console.log(`Servidor rodando com sucesso!`);
   console.log(`✅ SEM LOGIN - Todos podem usar!`);
+  console.log(`✅ SUPABASE CONECTADO!`);
 });
