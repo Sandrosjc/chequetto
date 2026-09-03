@@ -151,6 +151,26 @@ function getDefaultUser() {
 }
 
 // =============================================
+// 🔥 ROTA PARA A PÁGINA DE LOGIN
+// =============================================
+
+app.get('/login', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'login', 'index.html'));
+});
+
+app.get('/login/', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'login', 'index.html'));
+});
+
+app.get('/login/callback', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'login', 'callback.html'));
+});
+
+app.get('/login/callback.html', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'login', 'callback.html'));
+});
+
+// =============================================
 // ROTAS PÚBLICAS (SEM LOGIN)
 // =============================================
 
@@ -416,4 +436,5 @@ app.listen(PORT, () => {
   console.log(`Servidor rodando com sucesso!`);
   console.log(`✅ SEM LOGIN - Todos podem usar!`);
   console.log(`✅ SUPABASE CONECTADO!`);
+  console.log(`✅ ROTA /login/ configurada!`);
 });
